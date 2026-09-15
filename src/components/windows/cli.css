@@ -1,0 +1,315 @@
+@import url("https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap");
+.cli-window {
+  height: 100%;
+  padding: 14px 16px;
+  box-sizing: border-box;
+  font-family: "JetBrains Mono", "SF Mono", Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.65;
+  cursor: text;
+  --cli-bg: #0a0d12;
+  --cli-fg: #d7dee8;
+  --cli-accent: #34d399;
+  --cli-muted: #6b7890;
+  --cli-chip-bg: rgba(52, 211, 153, 0.1);
+  --cli-chip-border: rgba(52, 211, 153, 0.35);
+  background: var(--cli-bg);
+  color: var(--cli-fg);
+}
+.cli-window.theme-dracula {
+  --cli-bg: #1e1f29;
+  --cli-fg: #f8f8f2;
+  --cli-accent: #ff79c6;
+  --cli-muted: #6272a4;
+  --cli-chip-bg: rgba(189, 147, 249, 0.12);
+  --cli-chip-border: rgba(189, 147, 249, 0.4);
+}
+.cli-window.theme-monokai {
+  --cli-bg: #272822;
+  --cli-fg: #f8f8f2;
+  --cli-accent: #a6e22e;
+  --cli-muted: #75715e;
+  --cli-chip-bg: rgba(230, 219, 116, 0.12);
+  --cli-chip-border: rgba(230, 219, 116, 0.35);
+}
+.cli-window.theme-matrix {
+  --cli-bg: #000d03;
+  --cli-fg: #66ff9d;
+  --cli-accent: #00ff66;
+  --cli-muted: #1f7a44;
+  --cli-chip-bg: rgba(0, 255, 102, 0.08);
+  --cli-chip-border: rgba(0, 255, 102, 0.35);
+}
+.cli-window .cli-body {
+  height: 100%;
+  overflow-y: auto;
+  padding-right: 8px;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.cli-window .cli-body::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+.cli-window .cli-banner {
+  margin: 0 0 10px;
+  color: var(--cli-accent);
+  font-size: 11px;
+  line-height: 1.15;
+  letter-spacing: 1px;
+  text-shadow: 0 0 8px color-mix(in srgb, var(--cli-accent) 50%, transparent);
+  white-space: pre;
+  overflow-x: auto;
+}
+.cli-window .cli-out {
+  margin: 0 0 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--cli-fg);
+}
+.cli-window .cli-inline-cmd {
+  color: var(--cli-accent);
+  cursor: pointer;
+  -webkit-text-decoration: underline dotted;
+          text-decoration: underline dotted;
+}
+.cli-window .cli-inline-cmd:hover {
+  opacity: 0.8;
+}
+.cli-window .cli-line-input {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.cli-window .cli-prompt {
+  color: var(--cli-accent);
+  flex-shrink: 0;
+  font-weight: 600;
+}
+.cli-window .cli-active-row {
+  margin-bottom: 4px;
+}
+.cli-window .cli-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--cli-fg);
+  font: inherit;
+  caret-color: var(--cli-accent);
+  padding: 0;
+}
+.cli-window .cli-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.cli-window .cli-chip {
+  font-family: inherit;
+  font-size: 11.5px;
+  color: var(--cli-accent);
+  background: var(--cli-chip-bg);
+  border: 1px solid var(--cli-chip-border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+.cli-window .cli-chip:hover {
+  background-color: color-mix(in srgb, var(--cli-accent) 18%, transparent);
+}
+.cli-window .cli-chip:active {
+  transform: scale(0.96);
+}
+.cli-window {
+  /* --- Snake Game Styles --- */
+}
+.cli-window .cli-snake-wrap {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 10px;
+}
+.cli-window .cli-snake-canvas {
+  display: block;
+  image-rendering: pixelated;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+}
+.cli-window .cli-snake-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  padding: 4px 2px;
+}
+.cli-window .cli-snake-score {
+  font-family: "Press Start 2P", "JetBrains Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: #4dff88;
+  text-shadow: 0 0 6px rgba(77, 255, 136, 0.45);
+}
+.cli-window .cli-snake-toolbar-actions {
+  display: flex;
+  gap: 6px;
+}
+.cli-window .cli-snake-icon-btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  background: #1a222d;
+  color: #fff;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: transform 0.1s ease, background-color 0.15s ease;
+}
+.cli-window .cli-snake-icon-btn:hover {
+  background: #232e3d;
+}
+.cli-window .cli-snake-icon-btn:active {
+  transform: scale(0.92);
+}
+.cli-window .cli-snake-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(8, 10, 15, 0.85);
+  border-radius: 6px;
+  text-align: center;
+}
+.cli-window .cli-snake-overlay-title {
+  font-family: "Press Start 2P", "JetBrains Mono", monospace;
+  font-weight: 400;
+  font-size: 13px;
+  color: var(--cli-fg);
+  letter-spacing: 1px;
+  line-height: 1.6;
+}
+.cli-window .cli-snake-overlay-text {
+  font-size: 11px;
+  color: var(--cli-muted);
+}
+@media (max-width: 768px) {
+  .cli-window .cli-snake-kbd-hint {
+    display: none;
+  }
+}
+.cli-window .cli-snake-countdown {
+  font-family: "Press Start 2P", "JetBrains Mono", monospace;
+  font-size: 40px;
+  color: var(--cli-accent);
+  text-shadow: 0 0 16px color-mix(in srgb, var(--cli-accent) 70%, transparent);
+  animation: cliSnakeCountdownPulse 0.7s ease-in-out;
+}
+@keyframes cliSnakeCountdownPulse {
+  0% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.cli-window .cli-snake-btn {
+  margin-top: 4px;
+  font-family: "Press Start 2P", "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 400;
+  color: #06140c;
+  background: var(--cli-accent);
+  border: none;
+  border-radius: 6px;
+  padding: 9px 16px;
+  cursor: pointer;
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+.cli-window .cli-snake-btn:hover {
+  opacity: 0.9;
+}
+.cli-window .cli-snake-btn:active {
+  transform: scale(0.96);
+}
+.cli-window .cli-snake-mobile-controls {
+  display: none;
+  justify-content: center;
+  margin-top: 14px;
+}
+.cli-window .cli-snake-dpad {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 4px;
+}
+.cli-window .cli-snake-dpad-btn {
+  border: none;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--cli-accent) 45%, white) 0%, var(--cli-accent) 55%, color-mix(in srgb, var(--cli-accent) 65%, black) 100%);
+  color: #06140c;
+  font-size: 16px;
+  font-weight: 700;
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--cli-accent) 65%, black), 0 5px 10px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
+}
+.cli-window .cli-snake-dpad-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--cli-accent) 65%, black), 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+.cli-window .cli-snake-dpad-btn.up {
+  grid-column: 2;
+  grid-row: 1;
+}
+.cli-window .cli-snake-dpad-btn.left {
+  grid-column: 1;
+  grid-row: 2;
+}
+.cli-window .cli-snake-dpad-btn.right {
+  grid-column: 3;
+  grid-row: 2;
+}
+.cli-window .cli-snake-dpad-btn.down {
+  grid-column: 2;
+  grid-row: 3;
+}
+@media (max-width: 768px) {
+  .cli-window .cli-snake-mobile-controls {
+    display: flex;
+  }
+}
+@media (max-width: 480px) {
+  .cli-window {
+    font-size: 11.5px;
+    padding: 10px 12px;
+  }
+  .cli-window .cli-banner {
+    font-size: 9px;
+  }
+}/*# sourceMappingURL=cli.css.map */

@@ -1,0 +1,118 @@
+.dock {
+  display: flex;
+  gap: 0.75rem;
+  z-index: 99999;
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(99, 98, 98, 0.395);
+  padding-inline: 1rem;
+  padding-block: 0.75rem;
+  border-radius: 0.75rem;
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+}
+.dock .icon {
+  position: relative; /* Added relative positioning for absolute child .active-dot */
+  padding: 0.65rem;
+  border-radius: 0.5rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  aspect-ratio: 1/1;
+  width: 3.75rem;
+  transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+}
+.dock .github,
+.dock .cli {
+  background-color: black;
+}
+.dock .note {
+  background: linear-gradient(to bottom, rgb(255, 179, 87), rgb(255, 153, 28));
+}
+.dock .pdf {
+  background: linear-gradient(to bottom, rgb(255, 65, 78), rgb(255, 25, 40));
+}
+.dock .calender,
+.dock .mail {
+  background: linear-gradient(to bottom, rgb(105, 94, 255), rgb(66, 52, 255));
+}
+.dock .spotify {
+  background: linear-gradient(to bottom, rgb(78, 176, 33), rgb(53, 142, 12));
+}
+.dock .link {
+  background: linear-gradient(to bottom, rgb(163, 97, 170), rgb(142, 33, 154));
+}
+.dock {
+  /* Mouse Hover Magnification */
+}
+.dock .icon:hover {
+  transform: scale(1.25) translateY(-20%);
+}
+.dock .icon:hover + .icon,
+.dock .icon:has(+ .icon:hover) {
+  transform: scale(1.1) translateY(-10%);
+}
+.dock {
+  /* Keyboard Alt + S Selection Magnification */
+}
+.dock .icon.active {
+  transform: scale(1.25) translateY(-20%);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35);
+}
+.dock .icon.neighbor {
+  transform: scale(1.1) translateY(-10%);
+}
+.dock .active-dot {
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+@media (max-width: 650px) {
+  .dock {
+    gap: 0.5rem;
+    padding-inline: 0.45rem;
+    padding-block: 0.45rem;
+    border-radius: 0.45rem;
+  }
+  .dock .icon {
+    padding: 0.45rem;
+    width: 2.75rem;
+  }
+  .dock img {
+    width: 30px;
+  }
+  .dock .active-dot {
+    bottom: 2px;
+    width: 3px;
+    height: 3px;
+  }
+}
+@media (max-width: 450px) {
+  .dock {
+    gap: 0.35rem;
+    padding-inline: 0.35rem;
+    padding-block: 0.35rem;
+    border-radius: 0.35rem;
+  }
+  .dock .icon {
+    padding: 0.25rem;
+    width: 1.75rem;
+  }
+  .dock img {
+    width: 20px;
+  }
+  .dock .active-dot {
+    bottom: 1px;
+    width: 2.5px;
+    height: 2.5px;
+  }
+}/*# sourceMappingURL=dock.css.map */
