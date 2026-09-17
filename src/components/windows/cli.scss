@@ -2,8 +2,11 @@
 
 .cli-window {
     height: 100%;
+    width: 100%;
+    max-width: 100%;
     padding: 14px 16px;
     box-sizing: border-box;
+    overflow-x: hidden;
     font-family: "JetBrains Mono", "SF Mono", Menlo, monospace;
     font-size: 12.5px;
     line-height: 1.65;
@@ -48,7 +51,10 @@
 
     .cli-body {
         height: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
         overflow-y: auto;
+        overflow-x: hidden;
         padding-right: 8px;
         scrollbar-gutter: stable;
         -webkit-overflow-scrolling: touch;
@@ -144,12 +150,16 @@
     /* --- Snake Game Styles --- */
     .cli-snake-wrap {
         position: relative;
-        display: inline-block;
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
         margin-bottom: 10px;
     }
 
     .cli-snake-canvas {
         display: block;
+        max-width: 100%;
         image-rendering: pixelated;
         border: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 6px;
@@ -157,15 +167,29 @@
 
     // Always-visible header: score + sound toggle + start/pause.
     // Styled like the LCD readout strip on a retro handheld console.
+    // flex-wrap + min-width:0 on the score text are what actually fix
+    // the "spills outside the window" bug: without them, flex items
+    // refuse to shrink below their content width and the row overflows
+    // its container instead of wrapping when the window gets narrow.
     .cli-snake-toolbar {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         justify-content: space-between;
+        gap: 6px;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
         margin-bottom: 6px;
         padding: 4px 2px;
     }
 
     .cli-snake-score {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
         font-family: "Press Start 2P", "JetBrains Mono", monospace;
         font-size: 9px;
         letter-spacing: 1px;
@@ -175,12 +199,15 @@
 
     .cli-snake-toolbar-actions {
         display: flex;
+        flex-wrap: wrap;
+        flex-shrink: 0;
         gap: 6px;
     }
 
     .cli-snake-icon-btn {
         width: 26px;
         height: 26px;
+        flex: 0 0 26px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -317,6 +344,190 @@
     @media (max-width: 768px) {
         .cli-snake-mobile-controls {
             display: flex;
+        }
+    }
+
+    // --- retro cabinet: game-select menu ------------------------------
+    .cli-arcade-menu {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    .cli-arcade-aside {
+        width: 130px;
+        max-width: 100%;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .cli-arcade-aside-title {
+        font-family: "Press Start 2P", monospace;
+        font-size: 9px;
+        color: var(--cli-muted);
+        letter-spacing: 1px;
+        margin-bottom: 6px;
+    }
+
+    .cli-arcade-menu-item {
+        font-family: "Press Start 2P", monospace;
+        font-size: 9px;
+        letter-spacing: 0.5px;
+        padding: 10px 8px;
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        color: var(--cli-muted);
+        cursor: pointer;
+        transition: transform 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+
+        &.active {
+            color: var(--cli-accent);
+            border-color: color-mix(in srgb, var(--cli-accent) 50%, transparent);
+            animation: cliArcadeGlow 1.8s ease-in-out infinite;
+        }
+
+        &.active:hover {
+            transform: translateX(2px);
+        }
+
+        &.disabled {
+            opacity: 0.35;
+            cursor: default;
+        }
+    }
+
+    @keyframes cliArcadeGlow {
+        0%, 100% { box-shadow: 0 0 0 rgba(0, 0, 0, 0); }
+        50% { box-shadow: 0 0 12px color-mix(in srgb, var(--cli-accent) 55%, transparent); }
+    }
+
+    .cli-arcade-preview {
+        flex: 1 1 140px;
+        min-width: 0;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.02);
+    }
+
+    .cli-snake-preview-canvas {
+        image-rendering: pixelated;
+        border: 2px solid #334155;
+        border-radius: 6px;
+        box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.6);
+    }
+
+    // --- level select ---------------------------------------------------
+    .cli-arcade-levels {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .cli-arcade-level-card {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+        padding: 12px 14px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.02);
+        cursor: pointer;
+        box-sizing: border-box;
+        max-width: 100%;
+        transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+
+        &:hover {
+            transform: translateY(-2px);
+            border-color: color-mix(in srgb, var(--cli-accent) 45%, transparent);
+        }
+
+        &.active {
+            border-color: var(--cli-accent);
+            box-shadow: 0 0 14px color-mix(in srgb, var(--cli-accent) 40%, transparent);
+        }
+    }
+
+    .cli-arcade-level-name {
+        font-family: "Press Start 2P", monospace;
+        font-size: 10px;
+        color: var(--cli-fg);
+        letter-spacing: 0.5px;
+    }
+
+    .cli-arcade-level-best {
+        font-family: "Press Start 2P", monospace;
+        font-size: 8px;
+        color: var(--cli-accent);
+    }
+
+    // --- in-game power badge + pickup legend -----------------------------
+    .cli-snake-power-badge {
+        font-family: "Press Start 2P", monospace;
+        font-size: 8px;
+        color: #4fd9ff;
+        background: rgba(79, 217, 255, 0.12);
+        border: 1px solid rgba(79, 217, 255, 0.4);
+        border-radius: 5px;
+        padding: 4px 6px;
+        animation: cliSnakePowerPulse 0.8s ease-in-out infinite;
+    }
+
+    @keyframes cliSnakePowerPulse {
+        0%, 100% { opacity: 0.75; }
+        50% { opacity: 1; }
+    }
+
+    .cli-snake-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        max-width: 100%;
+        margin-bottom: 6px;
+        font-size: 9px;
+        color: var(--cli-muted);
+
+        span { display: flex; align-items: center; gap: 4px; }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 2px;
+            display: inline-block;
+
+            &.food { background: #ff6b6b; }
+            &.bonus { background: #ffd23f; }
+            &.power { background: #4fd9ff; }
+        }
+    }
+
+    .cli-snake-btn-secondary {
+        background: transparent;
+        border: 1px solid var(--cli-accent);
+        color: var(--cli-accent);
+    }
+
+    @media (max-width: 480px) {
+        .cli-arcade-menu {
+            flex-direction: column;
+        }
+        .cli-arcade-aside {
+            width: 100%;
+            flex-direction: row;
+            flex-wrap: wrap;
         }
     }
 

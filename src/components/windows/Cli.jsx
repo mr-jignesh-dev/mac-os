@@ -17,12 +17,6 @@ import "./cli.scss";
 const isMac = typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
 const modKey = isMac ? "⌘" : "Ctrl";
 
-// Helper function to check if user is on mobile
-const checkIsMobile = () => {
-  if (typeof window === "undefined") return false;
-  return window.innerWidth <= 768 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-};
-
 const TypedText = ({ text, speed = 8, onDone, onUpdate }) => {
   const [shown, setShown] = useState("");
 
@@ -64,19 +58,135 @@ const CommandChips = ({ items, onRun }) => (
 );
 
 // ---------------------------------------------------------------------------
-// Snake Game — retro handheld styling, synthesized SFX, mobile D-pad
+// Snake Arcade — retro cabinet flow: select game -> select level -> play.
+// Levels add obstacles and increase speed; two special pickups spawn during
+// play (gold = +5 bonus points, cyan = temporary "ghost mode" through walls
+// and obstacles). Best score per level is kept in localStorage.
 // ---------------------------------------------------------------------------
 
 const GRID = 18;
-const CELL = 15;
-const TICK_MS = 160;
+const CELL = 20; // was 15 — bigger play area, per feedback
 
-const SnakeGame = forwardRef(({ onGameOver, onGameStart }, ref) => {
+// Short, disconnected wall segments — used instead of full-width lines
+// with a single shared gap. A "wall of length N starting at x0" with a
+// single gap column is easy to accidentally cancel out where it crosses
+// a perpendicular wall (that's exactly what made the old MAZE RUN
+// unsolvable: the vertical wall's block sat right on top of both
+// horizontal walls' only opening). Segments avoid that class of bug
+// entirely, since there's no shared "gap coordinate" to misalign.
+const hSegment = (y, xStart, length) =>
+  Array.from({ length }, (_, i) => ({ x: xStart + i, y }));
+const vSegment = (x, yStart, length) =>
+  Array.from({ length }, (_, i) => ({ x, y: yStart + i }));
+
+const LEVELS = [
+  { id: 1, name: "OPEN FIELD", tick: 170, obstacles: [] },
+  {
+    id: 2,
+    name: "OBSTACLE FIELD",
+    tick: 155,
+    obstacles: [
+      { x: 3, y: 3 }, { x: 14, y: 3 }, { x: 3, y: 14 }, { x: 14, y: 14 },
+      { x: 9, y: 2 }, { x: 9, y: 15 }, { x: 2, y: 6 }, { x: 15, y: 6 },
+      { x: 2, y: 12 }, { x: 15, y: 12 },
+    ],
+  },
+  {
+    id: 3,
+    name: "MAZE RUN",
+    tick: 140,
+    obstacles: [
+      // Top wall: two segments, leaving open gaps at x 0-1, 8-9, and 16-17.
+      ...hSegment(4, 2, 6),
+      ...hSegment(4, 10, 6),
+      // A few short center pillars — never a full column, so left/right
+      // stay connected through the wide-open rows above and below them.
+      ...vSegment(9, 6, 2),
+      ...vSegment(9, 10, 2),
+      // Bottom wall, gaps offset from the top wall's so the path zigzags.
+      ...hSegment(13, 0, 6),
+      ...hSegment(13, 8, 6),
+    ],
+  },
+];
+
+const bestKey = (levelId) => `snake-best-level-${levelId}`;
+const getBest = (levelId) => {
+  try {
+    return parseInt(localStorage.getItem(bestKey(levelId)) || "0", 10) || 0;
+  } catch {
+    return 0;
+  }
+};
+const setBestIfHigher = (levelId, score) => {
+  try {
+    if (score > getBest(levelId)) localStorage.setItem(bestKey(levelId), String(score));
+  } catch {
+    /* private mode / storage disabled — ignore */
+  }
+};
+
+const INVINCIBLE_TICKS = 30; // ~4-5s depending on level speed
+const SPECIAL_EVERY_TICKS = 45;
+const SPECIAL_LIFETIME_TICKS = 40;
+const SPECIAL_SPAWN_CHANCE = 0.65;
+
+/** Decorative attract-mode loop for the game-select preview screen — a
+ *  self-playing, non-interactive snake wandering the mini screen. */
+const AttractPreview = () => {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    const size = 8;
+    canvas.width = 96;
+    canvas.height = 96;
+    const cols = Math.floor(canvas.width / size);
+    const rows = Math.floor(canvas.height / size);
+    let path = [{ x: 2, y: 2 }, { x: 1, y: 2 }, { x: 0, y: 2 }];
+    let dir = { x: 1, y: 0 };
+    let raf;
+    let last = 0;
+
+    const step = (ts) => {
+      if (ts - last > 180) {
+        last = ts;
+        if (Math.random() < 0.12) {
+          dir = Math.random() < 0.5 ? { x: dir.y, y: dir.x } : { x: -dir.y, y: -dir.x };
+        }
+        let next = { x: path[0].x + dir.x, y: path[0].y + dir.y };
+        if (next.x < 0 || next.x >= cols) { dir = { x: -dir.x, y: dir.y }; next = { x: path[0].x + dir.x, y: path[0].y }; }
+        if (next.y < 0 || next.y >= rows) { dir = { x: dir.x, y: -dir.y }; next = { x: path[0].x, y: path[0].y + dir.y }; }
+        path = [next, ...path].slice(0, 8);
+
+        ctx.fillStyle = "#0a0d12";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        path.forEach((seg, i) => {
+          ctx.fillStyle = i === 0 ? "#4dff88" : "#2fae63";
+          ctx.fillRect(seg.x * size, seg.y * size, size - 1, size - 1);
+        });
+      }
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  return <canvas ref={canvasRef} className="cli-snake-preview-canvas" />;
+};
+
+const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
   const canvasRef = useRef(null);
   const stateRef = useRef(null);
   const audioCtxRef = useRef(null);
-  const [phase, setPhase] = useState("ready");
+  const countdownTimers = useRef([]);
+
+  const [screen, setScreen] = useState("menu"); // menu | levels | game
+  const [levelIndex, setLevelIndex] = useState(0);
+  const [phase, setPhase] = useState("ready"); // ready | countdown | playing | paused | over
   const [score, setScore] = useState(0);
+  const [invincibleLeft, setInvincibleLeft] = useState(0);
+  const [countdown, setCountdown] = useState(null);
   const [soundOn, setSoundOn] = useState(() => {
     try {
       const saved = localStorage.getItem("snake-sound");
@@ -86,14 +196,17 @@ const SnakeGame = forwardRef(({ onGameOver, onGameStart }, ref) => {
     }
   });
 
+  const level = LEVELS[levelIndex];
+
+  // ---------------------------------------------------------------------
+  // Synthesized sound effects — no audio files to host or load.
+  // ---------------------------------------------------------------------
   const getAudioCtx = () => {
     if (!audioCtxRef.current) {
       const AC = window.AudioContext || window.webkitAudioContext;
       audioCtxRef.current = new AC();
     }
-    if (audioCtxRef.current.state === "suspended") {
-      audioCtxRef.current.resume();
-    }
+    if (audioCtxRef.current.state === "suspended") audioCtxRef.current.resume();
     return audioCtxRef.current;
   };
 
@@ -105,21 +218,21 @@ const SnakeGame = forwardRef(({ onGameOver, onGameStart }, ref) => {
       const gain = ctx.createGain();
       osc.type = type;
       osc.frequency.setValueAtTime(sweepFrom || freq, ctx.currentTime);
-      if (sweepFrom) {
-        osc.frequency.exponentialRampToValueAtTime(freq, ctx.currentTime + duration);
-      }
+      if (sweepFrom) osc.frequency.exponentialRampToValueAtTime(freq, ctx.currentTime + duration);
       gain.gain.setValueAtTime(0.09, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
       osc.connect(gain).connect(ctx.destination);
       osc.start();
       osc.stop(ctx.currentTime + duration);
     } catch {
-      /* Web Audio unavailable — fail silently */
+      /* Web Audio unavailable — game still works without sound */
     }
   };
 
   const playClick = () => beep(520, 0.045, "square");
   const playEat = () => beep(880, 0.09, "square", 480);
+  const playBonus = () => beep(1200, 0.12, "square", 700);
+  const playPower = () => beep(300, 0.22, "sine", 900);
   const playGameOver = () => beep(110, 0.35, "sawtooth", 420);
 
   const toggleSound = () => {
@@ -128,31 +241,42 @@ const SnakeGame = forwardRef(({ onGameOver, onGameStart }, ref) => {
       try {
         localStorage.setItem("snake-sound", JSON.stringify(next));
       } catch {
-        /* ignore storage errors */
+        /* ignore */
       }
       return next;
     });
   };
 
-  const randomFood = (snake) => {
+  // ---------------------------------------------------------------------
+  // Game state (mutable ref — avoids a re-render every tick)
+  // ---------------------------------------------------------------------
+  const randomEmptyCell = (snake, obstacles, exclude = []) => {
     let pos;
+    let guard = 0;
     do {
       pos = { x: Math.floor(Math.random() * GRID), y: Math.floor(Math.random() * GRID) };
-    } while (snake.some((s) => s.x === pos.x && s.y === pos.y));
+      guard += 1;
+    } while (
+      guard < 200 &&
+      (snake.some((s) => s.x === pos.x && s.y === pos.y) ||
+        obstacles.some((o) => o.x === pos.x && o.y === pos.y) ||
+        exclude.some((e) => e.x === pos.x && e.y === pos.y))
+    );
     return pos;
   };
 
-  const freshState = () => {
-    const snake = [
-      { x: 8, y: 9 },
-      { x: 7, y: 9 },
-      { x: 6, y: 9 },
-    ];
+  const freshState = (lvl) => {
+    const snake = [{ x: 8, y: 9 }, { x: 7, y: 9 }, { x: 6, y: 9 }];
     return {
       snake,
       dir: { x: 1, y: 0 },
       pendingDir: { x: 1, y: 0 },
-      food: randomFood(snake),
+      obstacles: lvl.obstacles,
+      food: randomEmptyCell(snake, lvl.obstacles),
+      special: null,
+      specialTicksLeft: 0,
+      invincibleTicksLeft: 0,
+      tickCount: 0,
       score: 0,
       over: false,
     };
@@ -163,74 +287,154 @@ const SnakeGame = forwardRef(({ onGameOver, onGameStart }, ref) => {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     const s = stateRef.current;
-
     ctx.fillStyle = "#0a0d12";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     if (!s) return;
 
+    ctx.fillStyle = "#3b4457";
+    s.obstacles.forEach((o) => ctx.fillRect(o.x * CELL, o.y * CELL, CELL - 1, CELL - 1));
+
     ctx.fillStyle = "#ff6b6b";
     ctx.fillRect(s.food.x * CELL, s.food.y * CELL, CELL - 1, CELL - 1);
 
+    if (s.special) {
+      const blinking = s.specialTicksLeft < 10 && s.specialTicksLeft % 4 < 2;
+      if (!blinking) {
+        ctx.fillStyle = s.special.kind === "bonus" ? "#ffd23f" : "#4fd9ff";
+        ctx.fillRect(s.special.x * CELL, s.special.y * CELL, CELL - 1, CELL - 1);
+      }
+    }
+
+    const invincible = s.invincibleTicksLeft > 0;
     s.snake.forEach((seg, i) => {
-      ctx.fillStyle = i === 0 ? "#4dff88" : "#2fae63";
+      const ghostFlash = invincible && s.tickCount % 2 === 0;
+      ctx.fillStyle = ghostFlash ? (i === 0 ? "#4fd9ff" : "#2b9fc7") : i === 0 ? "#4dff88" : "#2fae63";
       ctx.fillRect(seg.x * CELL, seg.y * CELL, CELL - 1, CELL - 1);
     });
   };
 
+  // BUG FIX: this used to run once with an empty dependency array, which
+  // fired while the arcade was still on the "menu" screen — before the
+  // <canvas> even existed (canvasRef.current was null). That left the
+  // canvas at the browser's default 300x150 buffer forever, so anything
+  // drawn below roughly grid row 10 (food included) was silently clipped
+  // outside the actual buffer. Keying this on `screen` re-runs it every
+  // time the game screen (and a fresh <canvas> element) mounts.
   useEffect(() => {
+    if (screen !== "game") return;
     const canvas = canvasRef.current;
     if (canvas) {
       canvas.width = GRID * CELL;
       canvas.height = GRID * CELL;
-      stateRef.current = freshState();
-      draw();
+      draw(); // avoid a blank flash before the next tick/countdown redraws it
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen]);
 
   useEffect(() => {
-    if (phase !== "playing") return;
+    if (screen !== "game" || phase !== "playing") return;
+
+    const endGame = (s) => {
+      s.over = true;
+      draw();
+      setPhase("over");
+      playGameOver();
+      setBestIfHigher(level.id, s.score);
+      onGameOver && onGameOver(s.score);
+    };
 
     const tick = () => {
       const s = stateRef.current;
       if (!s) return;
       s.dir = s.pendingDir;
-      const head = { x: s.snake[0].x + s.dir.x, y: s.snake[0].y + s.dir.y };
+      let head = { x: s.snake[0].x + s.dir.x, y: s.snake[0].y + s.dir.y };
+      const invincible = s.invincibleTicksLeft > 0;
 
       const hitWall = head.x < 0 || head.y < 0 || head.x >= GRID || head.y >= GRID;
-      const hitSelf = s.snake.some((seg) => seg.x === head.x && seg.y === head.y);
-      if (hitWall || hitSelf) {
-        s.over = true;
-        draw();
-        setPhase("over");
-        playGameOver();
-        onGameOver && onGameOver(s.score);
+      if (hitWall) {
+        if (invincible) {
+          head = { x: (head.x + GRID) % GRID, y: (head.y + GRID) % GRID }; // ghost-mode tunnel
+        } else {
+          endGame(s);
+          return;
+        }
+      }
+
+      const hitObstacle = s.obstacles.some((o) => o.x === head.x && o.y === head.y);
+      if (hitObstacle && !invincible) {
+        endGame(s);
+        return;
+      }
+
+      // Figure out whether this move eats something BEFORE checking
+      // self-collision. If it doesn't, the tail cell vacates this same
+      // tick — moving into it is the normal "chase your own tail" case,
+      // not a collision (this was the original off-by-one bug).
+      // Separately: ghost mode (the cyan pickup) now also forgives
+      // self-collision, not just walls/obstacles — "ghost" reads as
+      // full invincibility to a player, and a genuine self-hit still
+      // ending the run while the badge says you're invincible felt
+      // like the power-up was broken rather than intentional.
+      const eatsFood = head.x === s.food.x && head.y === s.food.y;
+      const eatsSpecial = !!(s.special && head.x === s.special.x && head.y === s.special.y);
+      const willGrow = eatsFood || eatsSpecial;
+      const bodyToCheck = willGrow ? s.snake : s.snake.slice(0, -1);
+
+      const hitSelf = bodyToCheck.some((seg) => seg.x === head.x && seg.y === head.y);
+      if (hitSelf && !invincible) {
+        endGame(s);
         return;
       }
 
       s.snake.unshift(head);
-      if (head.x === s.food.x && head.y === s.food.y) {
+
+      let grew = false;
+      if (eatsFood) {
         s.score += 1;
-        setScore(s.score);
-        s.food = randomFood(s.snake);
+        s.food = randomEmptyCell(s.snake, s.obstacles, s.special ? [s.special] : []);
         playEat();
-      } else {
-        s.snake.pop();
+        grew = true;
+      } else if (eatsSpecial) {
+        if (s.special.kind === "bonus") {
+          s.score += 5;
+          playBonus();
+        } else {
+          s.invincibleTicksLeft = INVINCIBLE_TICKS;
+          playPower();
+        }
+        s.special = null;
+        grew = true;
       }
+      if (!grew) s.snake.pop();
+
+      if (s.invincibleTicksLeft > 0) s.invincibleTicksLeft -= 1;
+      setInvincibleLeft(Math.ceil((s.invincibleTicksLeft * level.tick) / 1000));
+
+      s.tickCount += 1;
+      if (s.special) {
+        s.specialTicksLeft -= 1;
+        if (s.specialTicksLeft <= 0) s.special = null;
+      } else if (s.tickCount % SPECIAL_EVERY_TICKS === 0 && Math.random() < SPECIAL_SPAWN_CHANCE) {
+        s.special = {
+          ...randomEmptyCell(s.snake, s.obstacles, [s.food]),
+          kind: Math.random() < 0.7 ? "bonus" : "power",
+        };
+        s.specialTicksLeft = SPECIAL_LIFETIME_TICKS;
+      }
+
+      setScore(s.score);
       draw();
     };
 
-    const interval = setInterval(tick, TICK_MS);
+    const interval = setInterval(tick, level.tick);
     return () => clearInterval(interval);
-  }, [phase, onGameOver, soundOn]);
+  }, [screen, phase, soundOn, level, onGameOver]);
 
-  const countdownTimers = useRef([]);
-  const [countdown, setCountdown] = useState(null);
-
+  // --- 3-2-1 countdown, shared by Start / Resume / Play Again ------------
   const clearCountdownTimers = () => {
     countdownTimers.current.forEach(clearTimeout);
     countdownTimers.current = [];
   };
-
   useEffect(() => clearCountdownTimers, []);
 
   const runCountdownThen = (afterFn) => {
@@ -252,8 +456,8 @@ const SnakeGame = forwardRef(({ onGameOver, onGameStart }, ref) => {
     countdownTimers.current.push(finalT);
   };
 
-  const beginGame = (initialDirKey) => {
-    stateRef.current = freshState();
+  const beginGame = (initialDirKey, lvl = level) => {
+    stateRef.current = freshState(lvl);
     if (initialDirKey) {
       const map = {
         ArrowUp: { x: 0, y: -1 },
@@ -262,22 +466,34 @@ const SnakeGame = forwardRef(({ onGameOver, onGameStart }, ref) => {
         ArrowRight: { x: 1, y: 0 },
       };
       const dir = map[initialDirKey];
+      const s = stateRef.current;
       if (dir) {
-        stateRef.current.dir = dir;
-        stateRef.current.pendingDir = dir;
+        // The fresh snake's body trails to the LEFT of its head, so
+        // restarting with ArrowLeft would move the head straight into
+        // its own second segment on the very first tick — instant
+        // self-collision, which looked like "pressing arrow doesn't
+        // restart it" when really it restarted and died in the same
+        // frame. Only accept the pressed direction if it's actually safe.
+        const nextHead = { x: s.snake[0].x + dir.x, y: s.snake[0].y + dir.y };
+        const wouldHitSelf = s.snake.some((seg) => seg.x === nextHead.x && seg.y === nextHead.y);
+        if (!wouldHitSelf) {
+          s.dir = dir;
+          s.pendingDir = dir;
+        }
+        // else: keep the safe default rightward direction from freshState()
       }
     }
     setScore(0);
+    setInvincibleLeft(0);
     draw();
+    setScreen("game");
     runCountdownThen(() => {
       setPhase("playing");
       onGameStart && onGameStart();
     });
   };
 
-  const resumeGame = () => {
-    runCountdownThen(() => setPhase("playing"));
-  };
+  const resumeGame = () => runCountdownThen(() => setPhase("playing"));
 
   const togglePause = () => {
     if (phase === "playing") setPhase("paused");
@@ -285,10 +501,20 @@ const SnakeGame = forwardRef(({ onGameOver, onGameStart }, ref) => {
   };
 
   const applyDirection = (key) => {
-    if (phase === "ready" || phase === "over") {
-      beginGame(key);
+    if (screen === "levels") {
+      if (key === "ArrowUp") {
+        playClick();
+        setLevelIndex((i) => (i - 1 + LEVELS.length) % LEVELS.length);
+      } else if (key === "ArrowDown") {
+        playClick();
+        setLevelIndex((i) => (i + 1) % LEVELS.length);
+      }
       return;
     }
+    if (screen !== "game") return;
+    // Only steer while actually playing — arrows/D-pad no longer
+    // double as a "start" trigger. Starting is R / Space / Enter, or
+    // the Start / Resume / Play Again buttons, and nothing else.
     if (phase !== "playing") return;
 
     const s = stateRef.current;
@@ -306,6 +532,7 @@ const SnakeGame = forwardRef(({ onGameOver, onGameStart }, ref) => {
 
   const handleStartPause = () => {
     playClick();
+    if (screen !== "game") return;
     if (phase === "playing" || phase === "paused") togglePause();
     else beginGame();
   };
@@ -315,8 +542,27 @@ const SnakeGame = forwardRef(({ onGameOver, onGameStart }, ref) => {
     applyDirection(key);
   };
 
+  const enterLevels = () => {
+    playClick();
+    setScreen("levels");
+  };
+
+  const playLevel = (idx) => {
+    playClick();
+    setLevelIndex(idx);
+    beginGame(null, LEVELS[idx]);
+  };
+
+  const backToLevels = () => {
+    playClick();
+    setPhase("ready");
+    setScreen("levels");
+  };
+
   useImperativeHandle(ref, () => ({
     startGame: () => {
+      if (screen === "menu") return enterLevels();
+      if (screen === "levels") return playLevel(levelIndex);
       if (phase === "ready" || phase === "over") beginGame();
     },
     setDirection: (key) => applyDirection(key),
@@ -331,79 +577,149 @@ const SnakeGame = forwardRef(({ onGameOver, onGameStart }, ref) => {
   }));
 
   return (
-    <div className="cli-snake-wrap" style={{ position: "relative", width: GRID * CELL, margin: "10px 0" }}>
-      <div className="cli-snake-toolbar">
-        <span className="cli-snake-score">SCORE: {String(score).padStart(4, "0")}</span>
-        <div className="cli-snake-toolbar-actions">
-          <button
-            type="button"
-            className="cli-snake-icon-btn"
-            onClick={toggleSound}
-            title={soundOn ? "Mute sound" : "Unmute sound"}
+    <div className="cli-snake-wrap" style={{ width: "100%", maxWidth: screen === "game" ? GRID * CELL : 300, margin: "10px 0" }}>
+      {screen === "menu" && (
+        <div className="cli-arcade-menu">
+          <div className="cli-arcade-aside">
+            <div className="cli-arcade-aside-title">SELECT GAME</div>
+            <div className="cli-arcade-menu-item active" onClick={enterLevels}>▶ SNAKE</div>
+            <div className="cli-arcade-menu-item disabled">TETRIS · SOON</div>
+            <div className="cli-arcade-menu-item disabled">PONG · SOON</div>
+          </div>
+          <div className="cli-arcade-preview">
+            <AttractPreview />
+            <button type="button" className="cli-snake-btn" onClick={enterLevels}>
+              PRESS START
+            </button>
+          </div>
+        </div>
+      )}
+
+      {screen === "levels" && (
+        <div className="cli-arcade-levels">
+          <div className="cli-arcade-aside-title">SELECT LEVEL</div>
+          {LEVELS.map((lvl, i) => (
+            <div
+              key={lvl.id}
+              className={`cli-arcade-level-card ${i === levelIndex ? "active" : ""}`}
+              onClick={() => playLevel(i)}
+            >
+              <div className="cli-arcade-level-name">{lvl.name}</div>
+              <div className="cli-arcade-level-best">BEST: {String(getBest(lvl.id)).padStart(4, "0")}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {screen === "game" && (
+        <>
+          <div className="cli-snake-toolbar">
+            <button type="button" className="cli-snake-icon-btn" onClick={backToLevels} title="Back to levels">‹</button>
+            <span className="cli-snake-score">SCORE: {String(score).padStart(4, "0")}</span>
+            <div className="cli-snake-toolbar-actions">
+              {invincibleLeft > 0 && <span className="cli-snake-power-badge">⚡{invincibleLeft}s</span>}
+              <button
+                type="button"
+                className="cli-snake-icon-btn"
+                onClick={toggleSound}
+                title={soundOn ? "Mute sound" : "Unmute sound"}
+              >
+                {soundOn ? "🔊" : "🔇"}
+              </button>
+              <button type="button" className="cli-snake-icon-btn" onClick={handleStartPause}>
+                {phase === "playing" ? "⏸" : "▶"}
+              </button>
+            </div>
+          </div>
+
+          <div className="cli-snake-legend">
+            <span><i className="dot food" /> +1</span>
+            <span><i className="dot bonus" /> +5</span>
+            <span><i className="dot power" /> Ghost</span>
+          </div>
+
+          <div
+            style={{
+              position: "relative",
+              width: "100%",
+              maxWidth: GRID * CELL,
+              aspectRatio: "1 / 1",
+              margin: "0 auto",
+              border: "1px solid #334155",
+              borderRadius: "6px",
+              overflow: "hidden",
+            }}
           >
-            {soundOn ? "🔊" : "🔇"}
-          </button>
-          <button type="button" className="cli-snake-icon-btn" onClick={handleStartPause}>
-            {phase === "playing" ? "⏸" : "▶"}
-          </button>
-        </div>
-      </div>
+            <canvas
+              ref={canvasRef}
+              className="cli-snake-canvas"
+              width={GRID * CELL}
+              height={GRID * CELL}
+              style={{ display: "block", width: "100%", height: "100%" }}
+            />
 
-      <div style={{ position: "relative", width: GRID * CELL, height: GRID * CELL, border: "1px solid #334155", borderRadius: "6px", overflow: "hidden" }}>
-        <canvas ref={canvasRef} className="cli-snake-canvas" style={{ display: "block" }} />
+            {phase === "ready" && (
+              <div className="cli-snake-overlay">
+                <div className="cli-snake-overlay-title">🐍 {level.name}</div>
+                <div className="cli-snake-overlay-text cli-snake-kbd-hint" style={{ whiteSpace: "pre-line", lineHeight: "1.5", margin: "8px 0" }}>
+                  {"Press Space / Enter / Arrows to Start\nP to pause · Esc to quit"}
+                </div>
+                <button type="button" className="cli-snake-btn" onClick={() => { playClick(); beginGame(); }}>
+                  Start
+                </button>
+              </div>
+            )}
 
-        {phase === "ready" && (
-          <div className="cli-snake-overlay">
-            <div className="cli-snake-overlay-title">🐍 SNAKE</div>
-            <div className="cli-snake-overlay-text cli-snake-kbd-hint" style={{ whiteSpace: "pre-line", lineHeight: "1.5", margin: "8px 0" }}>
-              {"Press Space / Enter / Arrows to Start\nP to pause · Esc to quit"}
+            {phase === "countdown" && (
+              <div className="cli-snake-overlay">
+                <div className="cli-snake-countdown">{countdown}</div>
+              </div>
+            )}
+
+            {phase === "paused" && (
+              <div className="cli-snake-overlay">
+                <div className="cli-snake-overlay-title">PAUSED</div>
+                <button type="button" className="cli-snake-btn" onClick={() => { playClick(); resumeGame(); }}>
+                  Resume
+                </button>
+              </div>
+            )}
+
+            {phase === "over" && (
+              <div className="cli-snake-overlay">
+                <div className="cli-snake-overlay-title">GAME OVER</div>
+                <div className="cli-snake-overlay-text" style={{ whiteSpace: "pre-line", lineHeight: "1.6", margin: "10px 0" }}>
+                  {`${level.name}\nScore: ${score}  ·  Best: ${getBest(level.id)}`}
+                  <span className="cli-snake-kbd-hint">{"\n(Press R, Enter, or Space to restart)"}</span>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button type="button" className="cli-snake-btn" onClick={() => { playClick(); beginGame(); }}>
+                    Play Again
+                  </button>
+                  <button type="button" className="cli-snake-btn cli-snake-btn-secondary" onClick={backToLevels}>
+                    Levels
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Mobile-only retro D-pad — hidden on desktop via CSS media query,
+              since desktop already has physical arrow keys. */}
+          <div className="cli-snake-mobile-controls">
+            <div className="cli-snake-dpad">
+              <button type="button" className="cli-snake-dpad-btn up" onClick={() => handleDpadPress("ArrowUp")} aria-label="Up">▲</button>
+              <button type="button" className="cli-snake-dpad-btn left" onClick={() => handleDpadPress("ArrowLeft")} aria-label="Left">◀</button>
+              <button type="button" className="cli-snake-dpad-btn right" onClick={() => handleDpadPress("ArrowRight")} aria-label="Right">▶</button>
+              <button type="button" className="cli-snake-dpad-btn down" onClick={() => handleDpadPress("ArrowDown")} aria-label="Down">▼</button>
             </div>
-            <button type="button" className="cli-snake-btn" onClick={() => { playClick(); beginGame(); }}>
-              Start
-            </button>
           </div>
-        )}
-
-        {phase === "countdown" && (
-          <div className="cli-snake-overlay">
-            <div className="cli-snake-countdown">{countdown}</div>
-          </div>
-        )}
-
-        {phase === "paused" && (
-          <div className="cli-snake-overlay">
-            <div className="cli-snake-overlay-title">PAUSED</div>
-            <button type="button" className="cli-snake-btn" onClick={() => { playClick(); resumeGame(); }}>
-              Resume
-            </button>
-          </div>
-        )}
-
-        {phase === "over" && (
-          <div className="cli-snake-overlay">
-            <div className="cli-snake-overlay-title">GAME OVER</div>
-            <div className="cli-snake-overlay-text" style={{ whiteSpace: "pre-line", lineHeight: "1.6", margin: "10px 0" }}>
-              {`Final Score: ${score}`}
-              <span className="cli-snake-kbd-hint">{"\n(Press R, Enter, or Space to restart)"}</span>
-            </div>
-            <button type="button" className="cli-snake-btn" onClick={() => { playClick(); beginGame(); }}>
-              Play Again
-            </button>
-          </div>
-        )}
-      </div>
-
-      <div className="cli-snake-mobile-controls">
-        <div className="cli-snake-dpad">
-          <button type="button" className="cli-snake-dpad-btn up" onClick={() => handleDpadPress("ArrowUp")} aria-label="Up">▲</button>
-          <button type="button" className="cli-snake-dpad-btn left" onClick={() => handleDpadPress("ArrowLeft")} aria-label="Left">◀</button>
-          <button type="button" className="cli-snake-dpad-btn right" onClick={() => handleDpadPress("ArrowRight")} aria-label="Right">▶</button>
-          <button type="button" className="cli-snake-dpad-btn down" onClick={() => handleDpadPress("ArrowDown")} aria-label="Down">▼</button>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 });
+
 
 // ---------------------------------------------------------------------------
 // Main Terminal Component
@@ -440,7 +756,6 @@ const Cli = ({ windowName, setWindowsState }) => {
   const [theme, setTheme] = useState("default");
   const [quiz, setQuiz] = useState(null);
   const [gameActive, setGameActive] = useState(null);
-  const [isMobile, setIsMobile] = useState(checkIsMobile);
 
   const inputRef = useRef(null);
   const bodyRef = useRef(null);
@@ -449,7 +764,6 @@ const Cli = ({ windowName, setWindowsState }) => {
 
   const quizRef = useRef(quiz);
   const cmdHistoryRef = useRef(cmdHistory);
-  const isMobileRef = useRef(isMobile);
 
   useEffect(() => {
     quizRef.current = quiz;
@@ -458,16 +772,6 @@ const Cli = ({ windowName, setWindowsState }) => {
   useEffect(() => {
     cmdHistoryRef.current = cmdHistory;
   }, [cmdHistory]);
-
-  useEffect(() => {
-    isMobileRef.current = isMobile;
-  }, [isMobile]);
-
-  useEffect(() => {
-    const handleResize = () => setIsMobile(checkIsMobile());
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
 
   const nextId = () => (idRef.current += 1);
 
@@ -540,12 +844,6 @@ const Cli = ({ windowName, setWindowsState }) => {
 
       const [cmd, ...args] = trimmed.split(/\s+/);
       const commandKey = cmd.toLowerCase();
-
-      // Block shortcuts execution on mobile
-      if (commandKey === "shortcuts" && isMobileRef.current) {
-        pushLine("output", "Keyboard shortcuts are only available on desktop devices.");
-        return;
-      }
 
       if (commands[commandKey]) {
         if (quizRef.current) {
@@ -654,11 +952,6 @@ const Cli = ({ windowName, setWindowsState }) => {
       return null;
     },
     showShortcuts: () => {
-      if (isMobileRef.current) {
-        pushLine("output", "Keyboard shortcuts are only available on desktop devices.");
-        return null;
-      }
-      const altKey = isMac ? "Option" : "Alt";
       pushLine(
         "jsx",
         <div style={{ margin: "4px 0" }}>
@@ -666,9 +959,6 @@ const Cli = ({ windowName, setWindowsState }) => {
             <RiKeyboardFill style={{ verticalAlign: "middle", marginRight: "6px" }} /> Keyboard Shortcuts:
           </div>
           <div className="cli-out" style={{ display: "flex", flexDirection: "column", gap: "4px", fontSize: "0.9em", opacity: 0.9 }}>
-            <div><kbd>{altKey} + S</kbd> — Switch/cycle through Dock apps</div>
-            <div><kbd>{altKey} + X</kbd> — Close current focused window</div>
-            <div style={{ height: "4px" }} />
             <div><kbd>Tab</kbd> — Auto-complete command name</div>
             <div><kbd>{modKey} + C</kbd> — Cancel current input line or interrupt active quiz/game</div>
             <div><kbd>{modKey} + K</kbd> or <kbd>Ctrl + L</kbd> — Clear terminal screen</div>
@@ -679,10 +969,6 @@ const Cli = ({ windowName, setWindowsState }) => {
       return null;
     },
     showHelp: () => {
-      const availableCmds = Object.keys(commands).filter(
-        (c) => !(c === "shortcuts" && isMobileRef.current)
-      );
-
       pushLine(
         "jsx",
         <div style={{ margin: "6px 0" }}>
@@ -690,7 +976,7 @@ const Cli = ({ windowName, setWindowsState }) => {
             Available Commands:
           </div>
           <CommandChips
-            items={availableCmds.map((c) => ({ label: c, run: c }))}
+            items={Object.keys(commands).map((c) => ({ label: c, run: c }))}
             onRun={runCommand}
           />
         </div>
@@ -767,9 +1053,7 @@ const Cli = ({ windowName, setWindowsState }) => {
       e.preventDefault();
       if (!input.trim() || quiz) return;
 
-      const availableCmds = Object.keys(commands).filter(
-        (c) => !(c === "shortcuts" && isMobile)
-      );
+      const availableCmds = Object.keys(commands);
       const matches = availableCmds.filter((c) => c.startsWith(input.toLowerCase()));
 
       if (matches.length === 1) {
@@ -895,7 +1179,7 @@ const Cli = ({ windowName, setWindowsState }) => {
             }
             if (line.kind === "snake") {
               return (
-                <SnakeGame
+                <SnakeArcade
                   key={line.id}
                   ref={snakeRef}
                   onGameOver={handleSnakeGameOver}

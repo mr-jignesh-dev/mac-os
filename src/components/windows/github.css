@@ -47,9 +47,12 @@
   outline: none;
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.6);
 }
+.cards .card img {
+  border-radius: 0.5rem;
+}
 .cards .card .thumb {
   overflow: hidden;
-  border-radius: 0.5rem;
+  border-radius: 1rem;
 }
 .cards .card .thumb img {
   width: 100%;
@@ -58,6 +61,10 @@
      object-fit: cover;
   display: block;
   transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  -webkit-border-radius: 10px;
+  -moz-border-radius: 10px;
+  -ms-border-radius: 10px;
+  -o-border-radius: 10px;
 }
 .cards .card:hover .thumb img {
   transform: scale(1.06);
