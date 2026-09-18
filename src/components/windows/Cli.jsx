@@ -542,6 +542,39 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
     applyDirection(key);
   };
 
+  // --- Swipe-to-steer: swipe anywhere on the board instead of tapping
+  // the D-pad. Compares the touch's start/end position; whichever axis
+  // moved further decides the direction, and a minimum distance keeps
+  // an accidental tap (to dismiss an overlay, say) from registering as
+  // a swipe in some random direction.
+  const touchStartRef = useRef(null);
+  const SWIPE_THRESHOLD = 24; // px
+
+  const handleTouchStart = (e) => {
+    const t = e.touches[0];
+    touchStartRef.current = { x: t.clientX, y: t.clientY };
+  };
+
+  const handleTouchEnd = (e) => {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    if (!start) return;
+
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+    if (Math.max(absDx, absDy) < SWIPE_THRESHOLD) return; // too small — treat as a tap, not a swipe
+
+    let key;
+    if (absDx > absDy) key = dx > 0 ? "ArrowRight" : "ArrowLeft";
+    else key = dy > 0 ? "ArrowDown" : "ArrowUp";
+
+    playClick();
+    applyDirection(key);
+  };
+
   const enterLevels = () => {
     playClick();
     setScreen("levels");
@@ -658,6 +691,8 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
           </div>
 
           <div
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
             style={{
               position: "relative",
               // The ONE flexible element: takes whatever height remains
@@ -676,6 +711,9 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
               border: "1px solid #334155",
               borderRadius: "6px",
               overflow: "hidden",
+              // Stops the browser from trying to scroll/zoom the page
+              // on a swipe here, so the whole gesture is read as steering.
+              touchAction: "none",
             }}
           >
             <canvas
