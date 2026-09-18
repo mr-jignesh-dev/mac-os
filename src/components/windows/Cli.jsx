@@ -577,18 +577,37 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
   }));
 
   return (
-    <div className="cli-snake-wrap" style={{ width: "100%", maxWidth: screen === "game" ? GRID * CELL : 300, margin: "10px 0" }}>
+    <div
+      className="cli-snake-wrap"
+      // The terminal window refocuses its hidden text input on any
+      // click so typing works from anywhere — but that also means
+      // tapping the D-pad or any game button was bubbling up and
+      // refocusing it, popping the mobile keyboard right over the
+      // game. Stopping propagation here keeps every button's own
+      // onClick working while never triggering that refocus.
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        width: "100%",
+        maxWidth: screen === "game" ? GRID * CELL : 300,
+        height: screen === "game" ? "100%" : "auto",
+        margin: screen === "game" ? "0 auto" : "10px 0",
+      }}
+    >
       {screen === "menu" && (
-        <div className="cli-arcade-menu">
-          <div className="cli-arcade-aside">
-            <div className="cli-arcade-aside-title">SELECT GAME</div>
-            <div className="cli-arcade-menu-item active" onClick={enterLevels}>▶ SNAKE</div>
-            <div className="cli-arcade-menu-item disabled">TETRIS · SOON</div>
-            <div className="cli-arcade-menu-item disabled">PONG · SOON</div>
+        <div className="cli-arcade-device">
+          <div className="cli-arcade-screen">
+            <div className="cli-arcade-screen-games">
+              <div className="cli-arcade-aside-title">SELECT GAME</div>
+              <div className="cli-arcade-menu-item active" onClick={enterLevels}>▶ SNAKE</div>
+              <div className="cli-arcade-menu-item disabled">TETRIS · SOON</div>
+              <div className="cli-arcade-menu-item disabled">PONG · SOON</div>
+            </div>
+            <div className="cli-arcade-screen-preview">
+              <AttractPreview />
+            </div>
           </div>
-          <div className="cli-arcade-preview">
-            <AttractPreview />
-            <button type="button" className="cli-snake-btn" onClick={enterLevels}>
+          <div className="cli-arcade-device-buttons">
+            <button type="button" className="cli-snake-btn cli-arcade-start-btn" onClick={enterLevels}>
               PRESS START
             </button>
           </div>
@@ -612,7 +631,7 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
       )}
 
       {screen === "game" && (
-        <>
+        <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
           <div className="cli-snake-toolbar">
             <button type="button" className="cli-snake-icon-btn" onClick={backToLevels} title="Back to levels">‹</button>
             <span className="cli-snake-score">SCORE: {String(score).padStart(4, "0")}</span>
@@ -641,8 +660,17 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
           <div
             style={{
               position: "relative",
+              // The ONE flexible element: takes whatever height remains
+              // after the toolbar/legend/D-pad claim their natural size
+              // (flex-basis 0 + grow 1), then aspect-ratio derives a
+              // matching width from that — capped by max-width so it
+              // never overflows horizontally either. This replaces
+              // guessing at a vh-based cap: it fits by construction,
+              // on any window size, because the browser does the math.
+              flex: "1 1 0",
+              minHeight: 0,
               width: "100%",
-              maxWidth: GRID * CELL,
+              maxWidth: "100%",
               aspectRatio: "1 / 1",
               margin: "0 auto",
               border: "1px solid #334155",
@@ -714,7 +742,7 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
               <button type="button" className="cli-snake-dpad-btn down" onClick={() => handleDpadPress("ArrowDown")} aria-label="Down">▼</button>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
@@ -917,6 +945,10 @@ const Cli = ({ windowName, setWindowsState }) => {
     startSnake: () => {
       setGameActive("snake");
       pushLine("snake", null);
+      // On mobile, the input that was just focused to type "snake" is
+      // still holding the on-screen keyboard open, which covers the
+      // game. Drop focus immediately so it dismisses.
+      inputRef.current?.blur();
       return null;
     },
     startQuiz: () => {

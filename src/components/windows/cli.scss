@@ -174,6 +174,7 @@
     .cli-snake-toolbar {
         display: flex;
         flex-wrap: wrap;
+        flex-shrink: 0;
         align-items: center;
         justify-content: space-between;
         gap: 6px;
@@ -294,14 +295,19 @@
     // keys, so a redundant on-screen pad would just take up space.
     .cli-snake-mobile-controls {
         display: none;
+        flex-shrink: 0;
         justify-content: center;
-        margin-top: 14px;
+        margin-top: 12px;
+        // Never sit flush against the window's own bottom edge — leaves
+        // it reachable by a small scroll on very short windows instead
+        // of visually clipping right at the boundary.
+        padding-bottom: 10px;
     }
 
     .cli-snake-dpad {
         position: relative;
-        width: 132px;
-        height: 132px;
+        width: 112px;
+        height: 112px;
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         grid-template-rows: repeat(3, 1fr);
@@ -347,23 +353,42 @@
         }
     }
 
-    // --- retro cabinet: game-select menu ------------------------------
-    .cli-arcade-menu {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 14px;
+    // --- retro cabinet: game-select screen -------------------------------
+    // A device silhouette: a true square LCD screen on top (the game list,
+    // with a small preview screen tucked into its corner, like a real
+    // handheld's demo window), and a physical-looking button below it.
+    .cli-arcade-device {
         width: 100%;
-        max-width: 100%;
-        box-sizing: border-box;
+        max-width: 300px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
     }
 
-    .cli-arcade-aside {
-        width: 130px;
-        max-width: 100%;
-        flex-shrink: 0;
+    .cli-arcade-screen {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        box-sizing: border-box;
+        border: 2px solid #334155;
+        border-radius: 10px;
+        background: #05070d;
+        box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.6);
+        padding: 14px;
         display: flex;
         flex-direction: column;
         gap: 6px;
+        overflow: hidden;
+    }
+
+    .cli-arcade-screen-games {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        // leaves room on the right for the mini preview screen tucked
+        // into the bottom-right corner of the same LCD
+        padding-right: 34%;
     }
 
     .cli-arcade-aside-title {
@@ -406,26 +431,36 @@
         50% { box-shadow: 0 0 12px color-mix(in srgb, var(--cli-accent) 55%, transparent); }
     }
 
-    .cli-arcade-preview {
-        flex: 1 1 140px;
-        min-width: 0;
-        box-sizing: border-box;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 12px;
-        padding: 14px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.02);
+    // The small "preview within the screen" — a mini screen showing the
+    // attract-mode demo, anchored in the corner of the main LCD.
+    .cli-arcade-screen-preview {
+        position: absolute;
+        right: 12px;
+        bottom: 12px;
+        width: 34%;
+        aspect-ratio: 1 / 1;
+        border: 1px solid #334155;
+        border-radius: 6px;
+        overflow: hidden;
+        background: #0a0d12;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
     }
 
     .cli-snake-preview-canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
         image-rendering: pixelated;
-        border: 2px solid #334155;
-        border-radius: 6px;
-        box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.6);
+    }
+
+    .cli-arcade-device-buttons {
+        display: flex;
+        justify-content: center;
+    }
+
+    .cli-arcade-start-btn {
+        width: 100%;
+        max-width: 220px;
     }
 
     // --- level select ---------------------------------------------------
@@ -494,6 +529,7 @@
     .cli-snake-legend {
         display: flex;
         flex-wrap: wrap;
+        flex-shrink: 0;
         gap: 12px;
         max-width: 100%;
         margin-bottom: 6px;
@@ -518,17 +554,6 @@
         background: transparent;
         border: 1px solid var(--cli-accent);
         color: var(--cli-accent);
-    }
-
-    @media (max-width: 480px) {
-        .cli-arcade-menu {
-            flex-direction: column;
-        }
-        .cli-arcade-aside {
-            width: 100%;
-            flex-direction: row;
-            flex-wrap: wrap;
-        }
     }
 
     @media (max-width: 480px) {
