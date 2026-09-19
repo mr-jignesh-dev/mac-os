@@ -814,7 +814,7 @@ const QUIZ_QUESTIONS = [
   },
 ];
 
-const Cli = ({ windowName, setWindowsState }) => {
+const Cli = ({ windowName, setWindowsState, zIndex, bringToFront }) => {
   const [lines, setLines] = useState([]);
   const [input, setInput] = useState("");
   const [cmdHistory, setCmdHistory] = useState([]);
@@ -1186,7 +1186,12 @@ const Cli = ({ windowName, setWindowsState }) => {
   }, [gameActive]);
 
   return (
-    <MacWindow windowName={windowName} setWindowsState={setWindowsState}>
+    <MacWindow
+      windowName={windowName}
+      setWindowsState={setWindowsState}
+      zIndex={zIndex}
+      bringToFront={bringToFront}
+    >
       <div
         className={`cli-window theme-${theme}`}
         onClick={() => {
