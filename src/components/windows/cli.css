@@ -150,8 +150,11 @@
   display: block;
   max-width: 100%;
   image-rendering: pixelated;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 6px;
+}
+.cli-window .cli-snake-board {
+  border: 3px dashed #5b62c9;
+  border-radius: 10px;
+  background: #05070d;
 }
 .cli-window .cli-snake-toolbar {
   display: flex;
@@ -173,10 +176,15 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: "Press Start 2P", "JetBrains Mono", monospace;
-  font-size: 9px;
+  font-size: 12px;
   letter-spacing: 1px;
-  color: #4dff88;
-  text-shadow: 0 0 6px rgba(77, 255, 136, 0.45);
+  color: #f5d90a;
+  text-shadow: 0 0 6px rgba(245, 217, 10, 0.4);
+}
+.cli-window .cli-snake-best {
+  font-size: 8px;
+  margin-left: 8px;
+  opacity: 0.75;
 }
 .cli-window .cli-snake-toolbar-actions {
   display: flex;
@@ -185,37 +193,71 @@
   gap: 6px;
 }
 .cli-window .cli-snake-icon-btn {
-  width: 26px;
-  height: 26px;
-  flex: 0 0 26px;
+  width: 28px;
+  height: 24px;
+  flex: 0 0 28px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 13px;
-  background: #1a222d;
-  color: #fff;
-  border: 1px solid #334155;
-  border-radius: 6px;
+  background: transparent;
+  color: #f5d90a;
+  border: 2px solid #f5d90a;
+  border-radius: 4px;
   cursor: pointer;
-  transition: transform 0.1s ease, background-color 0.15s ease;
+  transition: transform 0.1s ease, background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 .cli-window .cli-snake-icon-btn:hover {
-  background: #232e3d;
+  background: rgba(245, 217, 10, 0.12);
 }
 .cli-window .cli-snake-icon-btn:active {
   transform: scale(0.92);
+}
+.cli-window .cli-snake-icon-btn.is-muted {
+  color: #ff5f5f;
+  border-color: #ff5f5f;
+}
+.cli-window .cli-snake-icon-btn.is-muted:hover {
+  background: rgba(255, 95, 95, 0.12);
+}
+.cli-window .cli-snake-best-badge {
+  font-family: "Press Start 2P", "JetBrains Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: #f5a623;
+  border: 2px solid #f5a623;
+  border-radius: 4px;
+  padding: 3px 8px;
+  text-shadow: 0 0 6px rgba(245, 166, 35, 0.5);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.cli-window .cli-snake-best-badge b {
+  font-weight: inherit;
+}
+.cli-window .cli-snake-best-inline {
+  color: #f5a623;
+  font-weight: 700;
 }
 .cli-window .cli-snake-overlay {
   position: absolute;
   inset: 0;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  background: rgba(8, 10, 15, 0.85);
-  border-radius: 6px;
   text-align: center;
+}
+.cli-window .cli-snake-modal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 88%;
+  padding: 18px 20px;
+  background: #0b0f1a;
+  border: 1px solid color-mix(in srgb, var(--cli-accent) 55%, transparent);
+  border-radius: 14px;
+  box-shadow: 0 0 26px color-mix(in srgb, var(--cli-accent) 35%, transparent), inset 0 0 20px rgba(0, 0, 0, 0.45);
 }
 .cli-window .cli-snake-overlay-title {
   font-family: "Press Start 2P", "JetBrains Mono", monospace;
@@ -283,19 +325,41 @@
 }
 .cli-window .cli-snake-dpad {
   position: relative;
-  width: 112px;
-  height: 112px;
+  width: 170px;
+  height: 170px;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: repeat(3, 1fr);
   gap: 4px;
+}
+.cli-window .cli-snake-dpad::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--cli-accent) 35%, transparent);
+  pointer-events: none;
+}
+.cli-window .cli-snake-dpad-center {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cli-window .cli-snake-dpad-center .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--cli-accent) 70%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--cli-accent) 70%, transparent);
 }
 .cli-window .cli-snake-dpad-btn {
   border: none;
   border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--cli-accent) 45%, white) 0%, var(--cli-accent) 55%, color-mix(in srgb, var(--cli-accent) 65%, black) 100%);
   color: #06140c;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
   box-shadow: 0 3px 0 color-mix(in srgb, var(--cli-accent) 65%, black), 0 5px 10px rgba(0, 0, 0, 0.4);
   cursor: pointer;
@@ -498,7 +562,7 @@
 .cli-window .cli-snake-legend .dot {
   width: 8px;
   height: 8px;
-  border-radius: 2px;
+  border-radius: 50%;
   display: inline-block;
 }
 .cli-window .cli-snake-legend .dot.food {

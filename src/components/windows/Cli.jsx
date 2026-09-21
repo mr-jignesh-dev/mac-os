@@ -65,7 +65,7 @@ const CommandChips = ({ items, onRun }) => (
 // ---------------------------------------------------------------------------
 
 const GRID = 18;
-const CELL = 20; // was 15 — bigger play area, per feedback
+const CELL = 14; // back down from 20 — the board should stay compact, not fill the window
 
 // Short, disconnected wall segments — used instead of full-width lines
 // with a single shared gap. A "wall of length N starting at x0" with a
@@ -282,6 +282,74 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
     };
   };
 
+  /** A little pixel-art apple instead of a flat square — body, leaf, stem. */
+  const drawApple = (ctx, cellX, cellY) => {
+    const cx = cellX * CELL + CELL / 2;
+    const cy = cellY * CELL + CELL / 2;
+    const r = CELL * 0.4;
+
+    ctx.fillStyle = "#e63946";
+    ctx.beginPath();
+    ctx.arc(cx, cy + r * 0.15, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#4caf50";
+    ctx.beginPath();
+    ctx.ellipse(cx + r * 0.55, cy - r * 0.95, r * 0.4, r * 0.2, -0.6, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "#6b4423";
+    ctx.lineWidth = Math.max(1, CELL * 0.09);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r * 0.75);
+    ctx.lineTo(cx + r * 0.2, cy - r * 1.3);
+    ctx.stroke();
+  };
+
+  /** A round pickup (bonus/power) instead of a flat square. */
+  const drawPickup = (ctx, cellX, cellY, color) => {
+    const cx = cellX * CELL + CELL / 2;
+    const cy = cellY * CELL + CELL / 2;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(cx, cy, CELL * 0.42, 0, Math.PI * 2);
+    ctx.fill();
+  };
+
+  /** Snake as one smooth stroked tube through segment centers, with a
+   *  lighter highlight line down the middle — reads as a rounded worm/hose
+   *  rather than a strip of separate blocks. */
+  const drawSnake = (ctx, snake, color) => {
+    if (snake.length === 1) {
+      const cx = snake[0].x * CELL + CELL / 2;
+      const cy = snake[0].y * CELL + CELL / 2;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(cx, cy, CELL * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
+
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    snake.forEach((seg, i) => {
+      const cx = seg.x * CELL + CELL / 2;
+      const cy = seg.y * CELL + CELL / 2;
+      if (i === 0) ctx.moveTo(cx, cy);
+      else ctx.lineTo(cx, cy);
+    });
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = CELL * 0.72;
+    ctx.stroke();
+
+    // lighter centerline — the "double outline" tube look from the reference
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.28)";
+    ctx.lineWidth = CELL * 0.72 * 0.3;
+    ctx.stroke();
+  };
+
   const draw = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -294,23 +362,18 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
     ctx.fillStyle = "#3b4457";
     s.obstacles.forEach((o) => ctx.fillRect(o.x * CELL, o.y * CELL, CELL - 1, CELL - 1));
 
-    ctx.fillStyle = "#ff6b6b";
-    ctx.fillRect(s.food.x * CELL, s.food.y * CELL, CELL - 1, CELL - 1);
+    drawApple(ctx, s.food.x, s.food.y);
 
     if (s.special) {
       const blinking = s.specialTicksLeft < 10 && s.specialTicksLeft % 4 < 2;
       if (!blinking) {
-        ctx.fillStyle = s.special.kind === "bonus" ? "#ffd23f" : "#4fd9ff";
-        ctx.fillRect(s.special.x * CELL, s.special.y * CELL, CELL - 1, CELL - 1);
+        drawPickup(ctx, s.special.x, s.special.y, s.special.kind === "bonus" ? "#ffd23f" : "#4fd9ff");
       }
     }
 
     const invincible = s.invincibleTicksLeft > 0;
-    s.snake.forEach((seg, i) => {
-      const ghostFlash = invincible && s.tickCount % 2 === 0;
-      ctx.fillStyle = ghostFlash ? (i === 0 ? "#4fd9ff" : "#2b9fc7") : i === 0 ? "#4dff88" : "#2fae63";
-      ctx.fillRect(seg.x * CELL, seg.y * CELL, CELL - 1, CELL - 1);
-    });
+    const ghostFlash = invincible && s.tickCount % 2 === 0;
+    drawSnake(ctx, s.snake, ghostFlash ? "#4fd9ff" : "#37c9c9");
   };
 
   // BUG FIX: this used to run once with an empty dependency array, which
@@ -622,8 +685,7 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
       style={{
         width: "100%",
         maxWidth: screen === "game" ? GRID * CELL : 300,
-        height: screen === "game" ? "100%" : "auto",
-        margin: screen === "game" ? "0 auto" : "10px 0",
+        margin: "10px auto",
       }}
     >
       {screen === "menu" && (
@@ -664,15 +726,16 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
       )}
 
       {screen === "game" && (
-        <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+        <div>
           <div className="cli-snake-toolbar">
             <button type="button" className="cli-snake-icon-btn" onClick={backToLevels} title="Back to levels">‹</button>
-            <span className="cli-snake-score">SCORE: {String(score).padStart(4, "0")}</span>
+            <span className="cli-snake-score">🍎 {score}</span>
+            <span className="cli-snake-best-badge">BEST <b>{getBest(level.id)}</b></span>
             <div className="cli-snake-toolbar-actions">
               {invincibleLeft > 0 && <span className="cli-snake-power-badge">⚡{invincibleLeft}s</span>}
               <button
                 type="button"
-                className="cli-snake-icon-btn"
+                className={`cli-snake-icon-btn ${!soundOn ? "is-muted" : ""}`}
                 onClick={toggleSound}
                 title={soundOn ? "Mute sound" : "Unmute sound"}
               >
@@ -693,23 +756,13 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
           <div
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
+            className="cli-snake-board"
             style={{
               position: "relative",
-              // The ONE flexible element: takes whatever height remains
-              // after the toolbar/legend/D-pad claim their natural size
-              // (flex-basis 0 + grow 1), then aspect-ratio derives a
-              // matching width from that — capped by max-width so it
-              // never overflows horizontally either. This replaces
-              // guessing at a vh-based cap: it fits by construction,
-              // on any window size, because the browser does the math.
-              flex: "1 1 0",
-              minHeight: 0,
               width: "100%",
-              maxWidth: "100%",
+              maxWidth: GRID * CELL,
               aspectRatio: "1 / 1",
               margin: "0 auto",
-              border: "1px solid #334155",
-              borderRadius: "6px",
               overflow: "hidden",
               // Stops the browser from trying to scroll/zoom the page
               // on a swipe here, so the whole gesture is read as steering.
@@ -726,13 +779,15 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
 
             {phase === "ready" && (
               <div className="cli-snake-overlay">
-                <div className="cli-snake-overlay-title">🐍 {level.name}</div>
-                <div className="cli-snake-overlay-text cli-snake-kbd-hint" style={{ whiteSpace: "pre-line", lineHeight: "1.5", margin: "8px 0" }}>
-                  {"Press Space / Enter / Arrows to Start\nP to pause · Esc to quit"}
+                <div className="cli-snake-modal">
+                  <div className="cli-snake-overlay-title">🐍 {level.name}</div>
+                  <div className="cli-snake-overlay-text cli-snake-kbd-hint" style={{ whiteSpace: "pre-line", lineHeight: "1.5", margin: "8px 0" }}>
+                    {"Press Space / Enter / Arrows to Start\nP to pause · Esc to quit"}
+                  </div>
+                  <button type="button" className="cli-snake-btn" onClick={() => { playClick(); beginGame(); }}>
+                    Start
+                  </button>
                 </div>
-                <button type="button" className="cli-snake-btn" onClick={() => { playClick(); beginGame(); }}>
-                  Start
-                </button>
               </div>
             )}
 
@@ -744,27 +799,32 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
 
             {phase === "paused" && (
               <div className="cli-snake-overlay">
-                <div className="cli-snake-overlay-title">PAUSED</div>
-                <button type="button" className="cli-snake-btn" onClick={() => { playClick(); resumeGame(); }}>
-                  Resume
-                </button>
+                <div className="cli-snake-modal">
+                  <div className="cli-snake-overlay-title">PAUSED</div>
+                  <button type="button" className="cli-snake-btn" onClick={() => { playClick(); resumeGame(); }}>
+                    Resume
+                  </button>
+                </div>
               </div>
             )}
 
             {phase === "over" && (
               <div className="cli-snake-overlay">
-                <div className="cli-snake-overlay-title">GAME OVER</div>
-                <div className="cli-snake-overlay-text" style={{ whiteSpace: "pre-line", lineHeight: "1.6", margin: "10px 0" }}>
-                  {`${level.name}\nScore: ${score}  ·  Best: ${getBest(level.id)}`}
-                  <span className="cli-snake-kbd-hint">{"\n(Press R, Enter, or Space to restart)"}</span>
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button type="button" className="cli-snake-btn" onClick={() => { playClick(); beginGame(); }}>
-                    Play Again
-                  </button>
-                  <button type="button" className="cli-snake-btn cli-snake-btn-secondary" onClick={backToLevels}>
-                    Levels
-                  </button>
+                <div className="cli-snake-modal">
+                  <div className="cli-snake-overlay-title">GAME OVER</div>
+                  <div className="cli-snake-overlay-text" style={{ whiteSpace: "pre-line", lineHeight: "1.6", margin: "10px 0" }}>
+                    {level.name}
+                    {"\n"}Score: {score} · Best: <span className="cli-snake-best-inline">{getBest(level.id)}</span>
+                    <span className="cli-snake-kbd-hint">{"\n(Press R, Enter, or Space to restart)"}</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button type="button" className="cli-snake-btn" onClick={() => { playClick(); beginGame(); }}>
+                      Play Again
+                    </button>
+                    <button type="button" className="cli-snake-btn cli-snake-btn-secondary" onClick={backToLevels}>
+                      Levels
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -776,6 +836,7 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
             <div className="cli-snake-dpad">
               <button type="button" className="cli-snake-dpad-btn up" onClick={() => handleDpadPress("ArrowUp")} aria-label="Up">▲</button>
               <button type="button" className="cli-snake-dpad-btn left" onClick={() => handleDpadPress("ArrowLeft")} aria-label="Left">◀</button>
+              <div className="cli-snake-dpad-center"><span className="dot" /></div>
               <button type="button" className="cli-snake-dpad-btn right" onClick={() => handleDpadPress("ArrowRight")} aria-label="Right">▶</button>
               <button type="button" className="cli-snake-dpad-btn down" onClick={() => handleDpadPress("ArrowDown")} aria-label="Down">▼</button>
             </div>
@@ -1064,16 +1125,20 @@ const Cli = ({ windowName, setWindowsState, zIndex, bringToFront }) => {
   }, []);
 
   const handleKeyDown = (e) => {
+    // All snake-game keys are handled by a dedicated global listener
+    // (see the effect below) that works regardless of whether this
+    // input has focus — clicking any game button used to blur it,
+    // which silently broke keyboard control entirely. Nothing to do
+    // here while the game owns input.
+    if (gameActive === "snake") return;
+
     const isCmdOrCtrl = e.metaKey || e.ctrlKey;
 
     if (isCmdOrCtrl && e.key.toLowerCase() === "c") {
       if (window.getSelection()?.toString().length > 0) return;
 
       e.preventDefault();
-      if (gameActive === "snake") {
-        snakeRef.current?.quit();
-        setGameActive(null);
-      } else if (quiz) {
+      if (quiz) {
         pushLine("input", input + "^C");
         pushLine("output", "Quiz cancelled.");
         setQuiz(null);
@@ -1088,34 +1153,6 @@ const Cli = ({ windowName, setWindowsState, zIndex, bringToFront }) => {
     if ((e.ctrlKey && e.key.toLowerCase() === "l") || (isCmdOrCtrl && e.key.toLowerCase() === "k")) {
       e.preventDefault();
       setLines([]);
-      return;
-    }
-
-    if (gameActive === "snake") {
-      if (e.key === " " || e.key === "Enter" || e.key.toLowerCase() === "r") {
-        e.preventDefault();
-        snakeRef.current?.startGame();
-        return;
-      }
-      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
-        e.preventDefault();
-        snakeRef.current?.setDirection(e.key);
-        return;
-      }
-      if (e.key.toLowerCase() === "p") {
-        e.preventDefault();
-        snakeRef.current?.togglePause();
-        return;
-      }
-      if (e.key === "Escape") {
-        e.preventDefault();
-        snakeRef.current?.quit();
-        setGameActive(null);
-        return;
-      }
-      if (e.key === "Tab") {
-        e.preventDefault();
-      }
       return;
     }
 
@@ -1170,6 +1207,51 @@ const Cli = ({ windowName, setWindowsState, zIndex, bringToFront }) => {
       return;
     }
   };
+
+  // Owns ALL snake-game keyboard controls, independent of focus. Any
+  // button click (D-pad, mute, Play Again, anything) blurs the hidden
+  // terminal input, and the effect below intentionally does NOT refocus
+  // it during gameplay (that's what stops the mobile keyboard popping
+  // over the game) — so relying on the input's own onKeyDown meant one
+  // click anywhere silently broke keyboard control. This listens on
+  // window directly instead, so it keeps working no matter what's focused.
+  useEffect(() => {
+    if (gameActive !== "snake") return;
+
+    const handleSnakeKeyDown = (e) => {
+      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+
+      if (isCmdOrCtrl && e.key.toLowerCase() === "c") {
+        e.preventDefault();
+        snakeRef.current?.quit();
+        setGameActive(null);
+        return;
+      }
+      if (e.key === " " || e.key === "Enter" || e.key.toLowerCase() === "r") {
+        e.preventDefault();
+        snakeRef.current?.startGame();
+        return;
+      }
+      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+        e.preventDefault();
+        snakeRef.current?.setDirection(e.key);
+        return;
+      }
+      if (e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        snakeRef.current?.togglePause();
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        snakeRef.current?.quit();
+        setGameActive(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleSnakeKeyDown);
+    return () => window.removeEventListener("keydown", handleSnakeKeyDown);
+  }, [gameActive]);
 
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
