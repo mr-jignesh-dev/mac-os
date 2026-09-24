@@ -333,11 +333,22 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
     ctx.beginPath();
-    snake.forEach((seg, i) => {
+    let prev = null;
+    snake.forEach((seg) => {
       const cx = seg.x * CELL + CELL / 2;
       const cy = seg.y * CELL + CELL / 2;
-      if (i === 0) ctx.moveTo(cx, cy);
-      else ctx.lineTo(cx, cy);
+      // Adjacent segments are always exactly 1 cell apart. A bigger gap
+      // only happens right after a ghost-mode wall wrap, where the head
+      // teleports to the opposite edge while the segments behind it are
+      // still on the far side — connecting those with a straight line
+      // stretched one "tube" all the way across the board. Starting a
+      // new subpath at the jump draws them as two separate pieces instead.
+      if (!prev || Math.abs(seg.x - prev.x) > 1 || Math.abs(seg.y - prev.y) > 1) {
+        ctx.moveTo(cx, cy);
+      } else {
+        ctx.lineTo(cx, cy);
+      }
+      prev = seg;
     });
 
     ctx.strokeStyle = color;

@@ -173,17 +173,17 @@
 
     // Always-visible header: score + sound toggle + start/pause.
     // Styled like the LCD readout strip on a retro handheld console.
-    // flex-wrap + min-width:0 on the score text are what actually fix
-    // the "spills outside the window" bug: without them, flex items
-    // refuse to shrink below their content width and the row overflows
-    // its container instead of wrapping when the window gets narrow.
+    // Deliberately nowrap — wrapping onto two rows read as broken
+    // compared to the single-row reference layout. min-width:0 +
+    // ellipsis on the text pieces are the safety net instead: they
+    // shrink/truncate rather than forcing a second row.
     .cli-snake-toolbar {
         display: flex;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         flex-shrink: 0;
         align-items: center;
         justify-content: space-between;
-        gap: 6px;
+        gap: 5px;
         width: 100%;
         max-width: 100%;
         box-sizing: border-box;
@@ -192,7 +192,7 @@
     }
 
     .cli-snake-score {
-        flex: 1 1 auto;
+        flex: 0 1 auto;
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -212,9 +212,9 @@
 
     .cli-snake-toolbar-actions {
         display: flex;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         flex-shrink: 0;
-        gap: 6px;
+        gap: 5px;
     }
 
     .cli-snake-icon-btn {
@@ -235,9 +235,6 @@
         &:hover { background: rgba(245, 217, 10, 0.12); }
         &:active { transform: scale(0.92); }
 
-        // Muted state reads as an alert (red), not just "off" — matches
-        // the reference's red mute icon rather than reusing the same
-        // yellow as everything else.
         &.is-muted {
             color: #ff5f5f;
             border-color: #ff5f5f;
@@ -265,8 +262,6 @@
         font-weight: 700;
     }
 
-    // Just a centering backdrop now — the board stays visible behind the
-    // modal card (matching the reference), rather than being dimmed out.
     .cli-snake-overlay {
         position: absolute;
         inset: 0;
@@ -276,8 +271,6 @@
         text-align: center;
     }
 
-    // The actual floating card — glowing border, sized to its content
-    // rather than filling the whole board.
     .cli-snake-modal {
         display: flex;
         flex-direction: column;
@@ -307,8 +300,6 @@
         color: var(--cli-muted);
     }
 
-    // Keyboard-only instructions (Space/Enter/Arrows/R) — meaningless on
-    // a touchscreen where the D-pad + Start/Pause button already exist.
     .cli-snake-kbd-hint {
         @media (max-width: 768px) {
             display: none;
@@ -346,17 +337,11 @@
         &:active { transform: scale(0.96); }
     }
 
-    // --- Mobile D-pad ---------------------------------------------------
-    // Hidden on desktop by default; desktop already has physical arrow
-    // keys, so a redundant on-screen pad would just take up space.
     .cli-snake-mobile-controls {
         display: none;
         flex-shrink: 0;
         justify-content: center;
         margin-top: 12px;
-        // Never sit flush against the window's own bottom edge — leaves
-        // it reachable by a small scroll on very short windows instead
-        // of visually clipping right at the boundary.
         padding-bottom: 10px;
     }
 
@@ -369,8 +354,6 @@
         grid-template-rows: repeat(3, 1fr);
         gap: 4px;
 
-        // Decorative outer ring tying the four buttons together into one
-        // "radial gamepad" shape instead of four loose floating circles.
         &::before {
             content: "";
             position: absolute;
@@ -436,10 +419,6 @@
         }
     }
 
-    // --- retro cabinet: game-select screen -------------------------------
-    // A device silhouette: a true square LCD screen on top (the game list,
-    // with a small preview screen tucked into its corner, like a real
-    // handheld's demo window), and a physical-looking button below it.
     .cli-arcade-device {
         width: 100%;
         max-width: 300px;
@@ -469,8 +448,6 @@
         display: flex;
         flex-direction: column;
         gap: 6px;
-        // leaves room on the right for the mini preview screen tucked
-        // into the bottom-right corner of the same LCD
         padding-right: 34%;
     }
 
@@ -514,8 +491,6 @@
         50% { box-shadow: 0 0 12px color-mix(in srgb, var(--cli-accent) 55%, transparent); }
     }
 
-    // The small "preview within the screen" — a mini screen showing the
-    // attract-mode demo, anchored in the corner of the main LCD.
     .cli-arcade-screen-preview {
         position: absolute;
         right: 12px;
@@ -546,7 +521,6 @@
         max-width: 220px;
     }
 
-    // --- level select ---------------------------------------------------
     .cli-arcade-levels {
         display: flex;
         flex-direction: column;
@@ -592,7 +566,6 @@
         color: var(--cli-accent);
     }
 
-    // --- in-game power badge + pickup legend -----------------------------
     .cli-snake-power-badge {
         font-family: "Press Start 2P", monospace;
         font-size: 8px;

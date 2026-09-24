@@ -21,7 +21,8 @@
     "react-rnd": "^10.5.3",
     "react-router-dom": "^7.18.4",
     "react-syntax-highlighter": "^16.1.1",
-    "sass": "^1.104.0"
+    "sass": "^1.104.0",
+    "styled-components": "^6.5.3"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

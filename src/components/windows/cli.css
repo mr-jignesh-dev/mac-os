@@ -158,11 +158,11 @@
 }
 .cli-window .cli-snake-toolbar {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  gap: 5px;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
@@ -170,7 +170,7 @@
   padding: 4px 2px;
 }
 .cli-window .cli-snake-score {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -188,9 +188,9 @@
 }
 .cli-window .cli-snake-toolbar-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   flex-shrink: 0;
-  gap: 6px;
+  gap: 5px;
 }
 .cli-window .cli-snake-icon-btn {
   width: 28px;
