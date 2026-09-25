@@ -2,7 +2,7 @@
   display: flex;
   gap: 0.75rem;
   z-index: 99999;
-  position: absolute;
+  position: fixed;
   bottom: 1rem;
   left: 50%;
   transform: translateX(-50%);
@@ -82,8 +82,7 @@
     padding-inline: 0.45rem;
     padding-block: 0.45rem;
     border-radius: 0.45rem;
-    position: fixed;
-    bottom: 20px;
+    bottom: 30px;
   }
   .dock .icon {
     padding: 0.45rem;
