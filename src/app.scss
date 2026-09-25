@@ -1,31 +1,22 @@
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+*{
+margin:0%;
+padding:0%;
+box-sizing: border-box;
+}
+html,body,#root{
+width: 100%;
+height: 100%;
+// font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+
 }
 
-html,
-body,
-#root {
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-}
-
-body {
-    overflow: hidden;
-}
-
-main {
-    width: 100%;
-    height: 100vh;
-
-    background-image: url("../public/bac.gif");
-    background-repeat: no-repeat;
-    background-size: cover;
-    background-position: center;
-
-    position: relative;
-
-    overflow: hidden;
+main{
+  width: 100%;
+  height: 100%;
+  background-image: url("../public/bac.gif");
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
+  position: relative;
 }

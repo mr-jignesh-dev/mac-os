@@ -1,20 +1,19 @@
 .dock {
     display: flex;
     gap: 0.75rem;
-    position: fixed;
-    z-index: 999999;
-    left: 50%;
+    z-index: 99999;
+    position: absolute;
     bottom: 1rem;
+    left: 50%;
     transform: translateX(-50%);
-    width: max-content;
-    max-width: calc(100vw - 1rem);
+
     background-color: rgba(99, 98, 98, 0.395);
     padding-inline: 1rem;
     padding-block: 0.75rem;
     border-radius: 0.75rem;
+    // border: 1px solid rgba(255, 255, 255, 0.12);
     backdrop-filter: blur(28px) saturate(160%);
     -webkit-backdrop-filter: blur(28px) saturate(160%);
-    isolation: isolate;
     
     .icon {
         position: relative; /* Added relative positioning for absolute child .active-dot */
@@ -95,8 +94,8 @@
         padding-inline: 0.45rem;
         padding-block: 0.45rem;
         border-radius: 0.45rem;
-        position: fixed !important;
-        bottom:  40px;
+        position: fixed;
+        bottom:  20px;
         .icon {
             padding: 0.45rem;
             width: 2.75rem;
