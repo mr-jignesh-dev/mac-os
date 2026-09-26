@@ -1,32 +1,48 @@
 .dock {
     display: flex;
     gap: 0.75rem;
+
+    /* Always locked to the viewport */
+    position: fixed;
     z-index: 99999;
-    position: absolute;
-    bottom: 1rem;
+
     left: 50%;
+    bottom: 1rem;
+
+    /* Keep horizontal centering without affecting vertical position */
     transform: translateX(-50%);
 
     background-color: rgba(99, 98, 98, 0.395);
+
     padding-inline: 1rem;
     padding-block: 0.75rem;
+
     border-radius: 0.75rem;
-    // border: 1px solid rgba(255, 255, 255, 0.12);
+
     backdrop-filter: blur(28px) saturate(160%);
     -webkit-backdrop-filter: blur(28px) saturate(160%);
-    
+
+    /* Make sure the dock itself doesn't create overflow */
+    max-width: calc(100vw - 1rem);
+
     .icon {
-        position: relative; /* Added relative positioning for absolute child .active-dot */
+        position: relative;
+
         padding: 0.65rem;
         border-radius: 0.5rem;
+
         display: flex;
         justify-content: center;
         align-items: center;
 
-        aspect-ratio: 1/1;
+        aspect-ratio: 1 / 1;
         width: 3.75rem;
 
-        transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+        flex-shrink: 0;
+
+        transition:
+            transform 0.5s cubic-bezier(0.19, 1, 0.22, 1),
+            box-shadow 0.3s ease;
     }
 
     .github,
@@ -35,24 +51,44 @@
     }
 
     .note {
-        background: linear-gradient(to bottom, rgb(255, 179, 87), rgb(255, 153, 28));
+        background: linear-gradient(
+            to bottom,
+            rgb(255, 179, 87),
+            rgb(255, 153, 28)
+        );
     }
 
     .pdf {
-        background: linear-gradient(to bottom, rgb(255, 65, 78), rgb(255, 25, 40));
+        background: linear-gradient(
+            to bottom,
+            rgb(255, 65, 78),
+            rgb(255, 25, 40)
+        );
     }
 
     .calender,
     .mail {
-        background: linear-gradient(to bottom, rgb(105, 94, 255), rgb(66, 52, 255));
+        background: linear-gradient(
+            to bottom,
+            rgb(105, 94, 255),
+            rgb(66, 52, 255)
+        );
     }
 
     .spotify {
-        background: linear-gradient(to bottom, rgb(78, 176, 33), rgb(53, 142, 12));
+        background: linear-gradient(
+            to bottom,
+            rgb(78, 176, 33),
+            rgb(53, 142, 12)
+        );
     }
 
     .link {
-        background: linear-gradient(to bottom, rgb(163, 97, 170), rgb(142, 33, 154));
+        background: linear-gradient(
+            to bottom,
+            rgb(163, 97, 170),
+            rgb(142, 33, 154)
+        );
     }
 
     /* Mouse Hover Magnification */
@@ -77,58 +113,102 @@
 
     .active-dot {
         position: absolute;
+
         bottom: 3px;
         left: 50%;
+
         transform: translateX(-50%);
+
         width: 4px;
         height: 4px;
+
         background-color: rgba(255, 255, 255, 0.9);
+
         border-radius: 50%;
+
         pointer-events: none;
     }
-} 
+}
 
-@media (max-width: 650px){
+
+/* =========================================
+   TABLET / MOBILE
+========================================= */
+
+@media (max-width: 650px) {
     .dock {
+        position: fixed;
+
+        left: 50%;
+        bottom: calc(20px + env(safe-area-inset-bottom));
+
         gap: 0.5rem;
+
         padding-inline: 0.45rem;
         padding-block: 0.45rem;
+
         border-radius: 0.45rem;
-        position: fixed;
-        bottom:  20px;
+
+        max-width: calc(100vw - 0.75rem);
+
         .icon {
             padding: 0.45rem;
             width: 2.75rem;
         }
+
         img {
             width: 30px;
+            height: 30px;
+            object-fit: contain;
         }
 
         .active-dot {
             bottom: 2px;
+
             width: 3px;
             height: 3px;
         }
     }
 }
 
-@media (max-width: 450px){
+
+/* =========================================
+   SMALL MOBILE
+========================================= */
+
+@media (max-width: 450px) {
     .dock {
+        position: fixed;
+
+        left: 50%;
+        bottom: calc(15px + env(safe-area-inset-bottom));
+
         gap: 0.35rem;
+
         padding-inline: 0.35rem;
         padding-block: 0.35rem;
+
         border-radius: 0.35rem;
+
+        /*
+         * Keep the entire Dock inside the viewport.
+         */
+        max-width: calc(100vw - 0.5rem);
 
         .icon {
             padding: 0.25rem;
             width: 1.75rem;
         }
+
         img {
             width: 20px;
+            height: 20px;
+            object-fit: contain;
         }
 
         .active-dot {
             bottom: 1px;
+
             width: 2.5px;
             height: 2.5px;
         }

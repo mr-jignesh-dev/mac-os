@@ -1,10 +1,12 @@
 .dock {
   display: flex;
   gap: 0.75rem;
+  /* Always locked to the viewport */
+  position: fixed;
   z-index: 99999;
-  position: absolute;
-  bottom: 1rem;
   left: 50%;
+  bottom: 1rem;
+  /* Keep horizontal centering without affecting vertical position */
   transform: translateX(-50%);
   background-color: rgba(99, 98, 98, 0.395);
   padding-inline: 1rem;
@@ -12,9 +14,11 @@
   border-radius: 0.75rem;
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
+  /* Make sure the dock itself doesn't create overflow */
+  max-width: calc(100vw - 1rem);
 }
 .dock .icon {
-  position: relative; /* Added relative positioning for absolute child .active-dot */
+  position: relative;
   padding: 0.65rem;
   border-radius: 0.5rem;
   display: flex;
@@ -22,7 +26,8 @@
   align-items: center;
   aspect-ratio: 1/1;
   width: 3.75rem;
-  transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+  flex-shrink: 0;
+  transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1), box-shadow 0.3s ease;
 }
 .dock .github,
 .dock .cli {
@@ -76,14 +81,19 @@
   pointer-events: none;
 }
 
+/* =========================================
+   TABLET / MOBILE
+========================================= */
 @media (max-width: 650px) {
   .dock {
+    position: fixed;
+    left: 50%;
+    bottom: calc(20px + env(safe-area-inset-bottom));
     gap: 0.5rem;
     padding-inline: 0.45rem;
     padding-block: 0.45rem;
     border-radius: 0.45rem;
-    position: fixed;
-    bottom: 20px;
+    max-width: calc(100vw - 0.75rem);
   }
   .dock .icon {
     padding: 0.45rem;
@@ -91,6 +101,9 @@
   }
   .dock img {
     width: 30px;
+    height: 30px;
+    -o-object-fit: contain;
+       object-fit: contain;
   }
   .dock .active-dot {
     bottom: 2px;
@@ -98,12 +111,22 @@
     height: 3px;
   }
 }
+/* =========================================
+   SMALL MOBILE
+========================================= */
 @media (max-width: 450px) {
   .dock {
+    position: fixed;
+    left: 50%;
+    bottom: calc(15px + env(safe-area-inset-bottom));
     gap: 0.35rem;
     padding-inline: 0.35rem;
     padding-block: 0.35rem;
     border-radius: 0.35rem;
+    /*
+     * Keep the entire Dock inside the viewport.
+     */
+    max-width: calc(100vw - 0.5rem);
   }
   .dock .icon {
     padding: 0.25rem;
@@ -111,6 +134,9 @@
   }
   .dock img {
     width: 20px;
+    height: 20px;
+    -o-object-fit: contain;
+       object-fit: contain;
   }
   .dock .active-dot {
     bottom: 1px;

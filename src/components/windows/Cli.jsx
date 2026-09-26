@@ -17,6 +17,30 @@ import "./cli.scss";
 const isMac = typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
 const modKey = isMac ? "⌘" : "Ctrl";
 
+/** Reads the currently-active --cli-accent off a DOM node (CSS custom
+ *  properties inherit down the tree, so this picks up whichever theme
+ *  class — default/dracula/monokai/matrix — is on the ancestor .cli-window
+ *  right now). Falls back to the default theme's teal if unavailable
+ *  (e.g. server-side render, or the node not mounted yet). */
+const getAccentColor = (node, fallback = "#34d399") => {
+  if (!node || typeof getComputedStyle === "undefined") return fallback;
+  const val = getComputedStyle(node).getPropertyValue("--cli-accent").trim();
+  return val || fallback;
+};
+
+/** Lightens (positive percent) or darkens (negative) a 6-digit hex color.
+ *  Used to derive a second shade (e.g. a snake's trailing-segment color)
+ *  from whatever the theme's single accent color happens to be. */
+const shadeColor = (hex, percent) => {
+  const num = parseInt(hex.replace("#", ""), 16);
+  if (Number.isNaN(num)) return hex;
+  const amt = Math.round(2.55 * percent);
+  const r = Math.min(255, Math.max(0, (num >> 16) + amt));
+  const g = Math.min(255, Math.max(0, ((num >> 8) & 0x00ff) + amt));
+  const b = Math.min(255, Math.max(0, (num & 0x0000ff) + amt));
+  return `#${(0x1000000 + r * 0x10000 + g * 0x100 + b).toString(16).slice(1)}`;
+};
+
 const TypedText = ({ text, speed = 8, onDone, onUpdate }) => {
   const [shown, setShown] = useState("");
 
@@ -147,6 +171,10 @@ const AttractPreview = () => {
     let dir = { x: 1, y: 0 };
     let raf;
     let last = 0;
+    // Read once per mount — this preview isn't long-lived enough to need
+    // to react to a theme change mid-render.
+    const accent = getAccentColor(canvas);
+    const accentDark = shadeColor(accent, -25);
 
     const step = (ts) => {
       if (ts - last > 180) {
@@ -162,7 +190,7 @@ const AttractPreview = () => {
         ctx.fillStyle = "#0a0d12";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         path.forEach((seg, i) => {
-          ctx.fillStyle = i === 0 ? "#4dff88" : "#2fae63";
+          ctx.fillStyle = i === 0 ? accent : accentDark;
           ctx.fillRect(seg.x * size, seg.y * size, size - 1, size - 1);
         });
       }
@@ -384,7 +412,11 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
 
     const invincible = s.invincibleTicksLeft > 0;
     const ghostFlash = invincible && s.tickCount % 2 === 0;
-    drawSnake(ctx, s.snake, ghostFlash ? "#4fd9ff" : "#37c9c9");
+    // Ghost mode stays a fixed cyan regardless of theme — it's the same
+    // status color as the "Ghost" legend dot and the power badge, not
+    // an aesthetic choice. Normal body color follows whichever theme
+    // is active instead of being hardcoded.
+    drawSnake(ctx, s.snake, ghostFlash ? "#4fd9ff" : getAccentColor(canvas));
   };
 
   // BUG FIX: this used to run once with an empty dependency array, which
