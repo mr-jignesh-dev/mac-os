@@ -13,7 +13,7 @@
     "image": "/project-image/image.png",
     "title": "SensAI - AI Career Coach",
     "description": "An all-in-one AI career coaching platform designed to advance career progression through personalized guidance, interview preparation, and smart job assistance tools.",
-    "tags": ["Next.js", "Clerk Auth", "TypeScript", "Gemini API", "PostgreSQL"],
+    "tags": ["Next.js", "Clerk Auth", "Gemini API"],
     "repoLink": "https://github.com/mr-jignesh-dev/AICareerCoach",
     "demoLink": "https://ai-career-coach-mj.vercel.app/"
   },
