@@ -20,25 +20,11 @@ const modKey = isMac ? "⌘" : "Ctrl";
 /** Reads the currently-active --cli-accent off a DOM node (CSS custom
  *  properties inherit down the tree, so this picks up whichever theme
  *  class — default/dracula/monokai/matrix — is on the ancestor .cli-window
- *  right now). Falls back to the default theme's teal if unavailable
- *  (e.g. server-side render, or the node not mounted yet). */
+ *  right now). Falls back to the default theme's teal if unavailable. */
 const getAccentColor = (node, fallback = "#34d399") => {
   if (!node || typeof getComputedStyle === "undefined") return fallback;
   const val = getComputedStyle(node).getPropertyValue("--cli-accent").trim();
   return val || fallback;
-};
-
-/** Lightens (positive percent) or darkens (negative) a 6-digit hex color.
- *  Used to derive a second shade (e.g. a snake's trailing-segment color)
- *  from whatever the theme's single accent color happens to be. */
-const shadeColor = (hex, percent) => {
-  const num = parseInt(hex.replace("#", ""), 16);
-  if (Number.isNaN(num)) return hex;
-  const amt = Math.round(2.55 * percent);
-  const r = Math.min(255, Math.max(0, (num >> 16) + amt));
-  const g = Math.min(255, Math.max(0, ((num >> 8) & 0x00ff) + amt));
-  const b = Math.min(255, Math.max(0, (num & 0x0000ff) + amt));
-  return `#${(0x1000000 + r * 0x10000 + g * 0x100 + b).toString(16).slice(1)}`;
 };
 
 const TypedText = ({ text, speed = 8, onDone, onUpdate }) => {
@@ -89,15 +75,11 @@ const CommandChips = ({ items, onRun }) => (
 // ---------------------------------------------------------------------------
 
 const GRID = 18;
-const CELL = 14; // back down from 20 — the board should stay compact, not fill the window
+const CELL = 14; // the board should stay compact, not fill the window
 
 // Short, disconnected wall segments — used instead of full-width lines
-// with a single shared gap. A "wall of length N starting at x0" with a
-// single gap column is easy to accidentally cancel out where it crosses
-// a perpendicular wall (that's exactly what made the old MAZE RUN
-// unsolvable: the vertical wall's block sat right on top of both
-// horizontal walls' only opening). Segments avoid that class of bug
-// entirely, since there's no shared "gap coordinate" to misalign.
+// with a single shared gap, which is easy to accidentally cancel out where
+// it crosses a perpendicular wall (that made the old MAZE RUN unsolvable).
 const hSegment = (y, xStart, length) =>
   Array.from({ length }, (_, i) => ({ x: xStart + i, y }));
 const vSegment = (x, yStart, length) =>
@@ -134,6 +116,13 @@ const LEVELS = [
   },
 ];
 
+// Games listed on the select screen. Only Snake is playable for now.
+const GAMES = [
+  { id: "snake", name: "SNAKE", desc: "Classic Nokia nibbler · 1997", available: true },
+  { id: "tetris", name: "TETRIS", desc: "Falling blocks puzzle · 1984", available: false },
+  { id: "pong", name: "PONG", desc: "Retro tennis rally · 1972", available: false },
+];
+
 const bestKey = (levelId) => `snake-best-level-${levelId}`;
 const getBest = (levelId) => {
   try {
@@ -155,48 +144,177 @@ const SPECIAL_EVERY_TICKS = 45;
 const SPECIAL_LIFETIME_TICKS = 40;
 const SPECIAL_SPAWN_CHANCE = 0.65;
 
-/** Decorative attract-mode loop for the game-select preview screen — a
- *  self-playing, non-interactive snake wandering the mini screen. */
+// ---------------------------------------------------------------------------
+// Shared canvas drawing. These live at module level (not inside a component)
+// and take the cell size as an argument, so the real game AND the select-
+// screen preview render through the exact same code. That is the actual fix
+// for "the two snakes look different": there is only one snake renderer.
+// ---------------------------------------------------------------------------
+
+/** A little pixel-art apple: body, leaf, stem. */
+const drawApple = (ctx, cellX, cellY, cellSize) => {
+  const cx = cellX * cellSize + cellSize / 2;
+  const cy = cellY * cellSize + cellSize / 2;
+  const r = cellSize * 0.4;
+
+  ctx.fillStyle = "#e63946";
+  ctx.beginPath();
+  ctx.arc(cx, cy + r * 0.15, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#4caf50";
+  ctx.beginPath();
+  ctx.ellipse(cx + r * 0.55, cy - r * 0.95, r * 0.4, r * 0.2, -0.6, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = "#6b4423";
+  ctx.lineWidth = Math.max(1, cellSize * 0.09);
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - r * 0.75);
+  ctx.lineTo(cx + r * 0.2, cy - r * 1.3);
+  ctx.stroke();
+};
+
+/** A round pickup (bonus/power). */
+const drawPickup = (ctx, cellX, cellY, cellSize, color) => {
+  const cx = cellX * cellSize + cellSize / 2;
+  const cy = cellY * cellSize + cellSize / 2;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(cx, cy, cellSize * 0.42, 0, Math.PI * 2);
+  ctx.fill();
+};
+
+/** Snake as one smooth stroked tube through segment centers, with a lighter
+ *  highlight line down the middle. */
+const drawSnake = (ctx, snake, color, cellSize) => {
+  if (snake.length === 1) {
+    const cx = snake[0].x * cellSize + cellSize / 2;
+    const cy = snake[0].y * cellSize + cellSize / 2;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(cx, cy, cellSize * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  let prev = null;
+  snake.forEach((seg) => {
+    const cx = seg.x * cellSize + cellSize / 2;
+    const cy = seg.y * cellSize + cellSize / 2;
+    // Adjacent segments are always exactly 1 cell apart. A bigger gap only
+    // happens right after a ghost-mode wall wrap, where the head teleports
+    // to the opposite edge while the segments behind it are still on the far
+    // side — start a new subpath there instead of stretching a line across.
+    if (!prev || Math.abs(seg.x - prev.x) > 1 || Math.abs(seg.y - prev.y) > 1) {
+      ctx.moveTo(cx, cy);
+    } else {
+      ctx.lineTo(cx, cy);
+    }
+    prev = seg;
+  });
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = cellSize * 0.72;
+  ctx.stroke();
+
+  // lighter centerline — the "double outline" tube look
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.28)";
+  ctx.lineWidth = cellSize * 0.72 * 0.3;
+  ctx.stroke();
+};
+
+/** Self-playing demo for the select screen. It uses the same drawSnake and
+ *  drawApple as the real game, and actually hunts the apple, so what you see
+ *  here is what you get when you press start. */
 const AttractPreview = () => {
   const canvasRef = useRef(null);
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
-    const size = 8;
-    canvas.width = 96;
-    canvas.height = 96;
-    const cols = Math.floor(canvas.width / size);
-    const rows = Math.floor(canvas.height / size);
-    let path = [{ x: 2, y: 2 }, { x: 1, y: 2 }, { x: 0, y: 2 }];
+    const COLS = 12;
+    const ROWS = 12;
+    const size = 14;
+    canvas.width = COLS * size;
+    canvas.height = ROWS * size;
+    const accent = getAccentColor(canvas);
+
+    const DIRS = [
+      { x: 1, y: 0 },
+      { x: 0, y: 1 },
+      { x: -1, y: 0 },
+      { x: 0, y: -1 },
+    ];
+    const startSnake = () => [{ x: 4, y: 6 }, { x: 3, y: 6 }, { x: 2, y: 6 }];
+    const inBounds = (p) => p.x >= 0 && p.y >= 0 && p.x < COLS && p.y < ROWS;
+    const onSnake = (snake, p) => snake.some((s) => s.x === p.x && s.y === p.y);
+    const randomFood = (snake) => {
+      let p;
+      let guard = 0;
+      do {
+        p = { x: Math.floor(Math.random() * COLS), y: Math.floor(Math.random() * ROWS) };
+        guard += 1;
+      } while (guard < 100 && onSnake(snake, p));
+      return p;
+    };
+
+    let snake = startSnake();
     let dir = { x: 1, y: 0 };
+    let food = randomFood(snake);
     let raf;
     let last = 0;
-    // Read once per mount — this preview isn't long-lived enough to need
-    // to react to a theme change mid-render.
-    const accent = getAccentColor(canvas);
-    const accentDark = shadeColor(accent, -25);
 
-    const step = (ts) => {
-      if (ts - last > 180) {
-        last = ts;
-        if (Math.random() < 0.12) {
-          dir = Math.random() < 0.5 ? { x: dir.y, y: dir.x } : { x: -dir.y, y: -dir.x };
-        }
-        let next = { x: path[0].x + dir.x, y: path[0].y + dir.y };
-        if (next.x < 0 || next.x >= cols) { dir = { x: -dir.x, y: dir.y }; next = { x: path[0].x + dir.x, y: path[0].y }; }
-        if (next.y < 0 || next.y >= rows) { dir = { x: dir.x, y: -dir.y }; next = { x: path[0].x, y: path[0].y + dir.y }; }
-        path = [next, ...path].slice(0, 8);
-
-        ctx.fillStyle = "#0a0d12";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        path.forEach((seg, i) => {
-          ctx.fillStyle = i === 0 ? accent : accentDark;
-          ctx.fillRect(seg.x * size, seg.y * size, size - 1, size - 1);
-        });
-      }
-      raf = requestAnimationFrame(step);
+    const render = () => {
+      ctx.fillStyle = "#0a0d12";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      drawApple(ctx, food.x, food.y, size);
+      drawSnake(ctx, snake, accent, size);
     };
-    raf = requestAnimationFrame(step);
+
+    const step = () => {
+      const head = snake[0];
+      // Candidate moves: never reverse, stay on the board, never hit itself.
+      const options = DIRS.filter((d) => !(d.x === -dir.x && d.y === -dir.y))
+        .map((d) => ({ d, p: { x: head.x + d.x, y: head.y + d.y } }))
+        .filter(({ p }) => inBounds(p) && !onSnake(snake.slice(0, -1), p));
+
+      if (options.length === 0) {
+        // Boxed in — restart the demo.
+        snake = startSnake();
+        dir = { x: 1, y: 0 };
+        food = randomFood(snake);
+        return;
+      }
+
+      // Usually head toward the apple, occasionally wander.
+      const dist = (p) => Math.abs(p.x - food.x) + Math.abs(p.y - food.y);
+      options.sort((a, b) => dist(a.p) - dist(b.p));
+      const pick = Math.random() < 0.8 ? options[0] : options[Math.floor(Math.random() * options.length)];
+
+      dir = pick.d;
+      const ate = pick.p.x === food.x && pick.p.y === food.y;
+      snake = [pick.p, ...snake];
+      if (ate) {
+        if (snake.length > 12) snake.pop(); // cap the length so it never fills the screen
+        food = randomFood(snake);
+      } else {
+        snake.pop();
+      }
+    };
+
+    render();
+    const loop = (ts) => {
+      if (ts - last > 170) {
+        last = ts;
+        step();
+        render();
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   }, []);
 
@@ -310,85 +428,6 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
     };
   };
 
-  /** A little pixel-art apple instead of a flat square — body, leaf, stem. */
-  const drawApple = (ctx, cellX, cellY) => {
-    const cx = cellX * CELL + CELL / 2;
-    const cy = cellY * CELL + CELL / 2;
-    const r = CELL * 0.4;
-
-    ctx.fillStyle = "#e63946";
-    ctx.beginPath();
-    ctx.arc(cx, cy + r * 0.15, r, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = "#4caf50";
-    ctx.beginPath();
-    ctx.ellipse(cx + r * 0.55, cy - r * 0.95, r * 0.4, r * 0.2, -0.6, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = "#6b4423";
-    ctx.lineWidth = Math.max(1, CELL * 0.09);
-    ctx.beginPath();
-    ctx.moveTo(cx, cy - r * 0.75);
-    ctx.lineTo(cx + r * 0.2, cy - r * 1.3);
-    ctx.stroke();
-  };
-
-  /** A round pickup (bonus/power) instead of a flat square. */
-  const drawPickup = (ctx, cellX, cellY, color) => {
-    const cx = cellX * CELL + CELL / 2;
-    const cy = cellY * CELL + CELL / 2;
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(cx, cy, CELL * 0.42, 0, Math.PI * 2);
-    ctx.fill();
-  };
-
-  /** Snake as one smooth stroked tube through segment centers, with a
-   *  lighter highlight line down the middle — reads as a rounded worm/hose
-   *  rather than a strip of separate blocks. */
-  const drawSnake = (ctx, snake, color) => {
-    if (snake.length === 1) {
-      const cx = snake[0].x * CELL + CELL / 2;
-      const cy = snake[0].y * CELL + CELL / 2;
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(cx, cy, CELL * 0.4, 0, Math.PI * 2);
-      ctx.fill();
-      return;
-    }
-
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    let prev = null;
-    snake.forEach((seg) => {
-      const cx = seg.x * CELL + CELL / 2;
-      const cy = seg.y * CELL + CELL / 2;
-      // Adjacent segments are always exactly 1 cell apart. A bigger gap
-      // only happens right after a ghost-mode wall wrap, where the head
-      // teleports to the opposite edge while the segments behind it are
-      // still on the far side — connecting those with a straight line
-      // stretched one "tube" all the way across the board. Starting a
-      // new subpath at the jump draws them as two separate pieces instead.
-      if (!prev || Math.abs(seg.x - prev.x) > 1 || Math.abs(seg.y - prev.y) > 1) {
-        ctx.moveTo(cx, cy);
-      } else {
-        ctx.lineTo(cx, cy);
-      }
-      prev = seg;
-    });
-
-    ctx.strokeStyle = color;
-    ctx.lineWidth = CELL * 0.72;
-    ctx.stroke();
-
-    // lighter centerline — the "double outline" tube look from the reference
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.28)";
-    ctx.lineWidth = CELL * 0.72 * 0.3;
-    ctx.stroke();
-  };
-
   const draw = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -401,31 +440,25 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
     ctx.fillStyle = "#3b4457";
     s.obstacles.forEach((o) => ctx.fillRect(o.x * CELL, o.y * CELL, CELL - 1, CELL - 1));
 
-    drawApple(ctx, s.food.x, s.food.y);
+    drawApple(ctx, s.food.x, s.food.y, CELL);
 
     if (s.special) {
       const blinking = s.specialTicksLeft < 10 && s.specialTicksLeft % 4 < 2;
       if (!blinking) {
-        drawPickup(ctx, s.special.x, s.special.y, s.special.kind === "bonus" ? "#ffd23f" : "#4fd9ff");
+        drawPickup(ctx, s.special.x, s.special.y, CELL, s.special.kind === "bonus" ? "#ffd23f" : "#4fd9ff");
       }
     }
 
     const invincible = s.invincibleTicksLeft > 0;
     const ghostFlash = invincible && s.tickCount % 2 === 0;
     // Ghost mode stays a fixed cyan regardless of theme — it's the same
-    // status color as the "Ghost" legend dot and the power badge, not
-    // an aesthetic choice. Normal body color follows whichever theme
-    // is active instead of being hardcoded.
-    drawSnake(ctx, s.snake, ghostFlash ? "#4fd9ff" : getAccentColor(canvas));
+    // status color as the "Ghost" legend dot and the power badge. Normal
+    // body color follows whichever theme is active.
+    drawSnake(ctx, s.snake, ghostFlash ? "#4fd9ff" : getAccentColor(canvas), CELL);
   };
 
-  // BUG FIX: this used to run once with an empty dependency array, which
-  // fired while the arcade was still on the "menu" screen — before the
-  // <canvas> even existed (canvasRef.current was null). That left the
-  // canvas at the browser's default 300x150 buffer forever, so anything
-  // drawn below roughly grid row 10 (food included) was silently clipped
-  // outside the actual buffer. Keying this on `screen` re-runs it every
-  // time the game screen (and a fresh <canvas> element) mounts.
+  // Size the canvas every time the game screen (and a fresh <canvas>)
+  // mounts — the canvas doesn't exist while on the menu/levels screens.
   useEffect(() => {
     if (screen !== "game") return;
     const canvas = canvasRef.current;
@@ -472,15 +505,9 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
         return;
       }
 
-      // Figure out whether this move eats something BEFORE checking
-      // self-collision. If it doesn't, the tail cell vacates this same
-      // tick — moving into it is the normal "chase your own tail" case,
-      // not a collision (this was the original off-by-one bug).
-      // Separately: ghost mode (the cyan pickup) now also forgives
-      // self-collision, not just walls/obstacles — "ghost" reads as
-      // full invincibility to a player, and a genuine self-hit still
-      // ending the run while the badge says you're invincible felt
-      // like the power-up was broken rather than intentional.
+      // Work out whether this move eats something BEFORE checking
+      // self-collision: if it doesn't, the tail cell vacates this same tick,
+      // so moving into it is legal. Ghost mode also forgives self-collision.
       const eatsFood = head.x === s.food.x && head.y === s.food.y;
       const eatsSpecial = !!(s.special && head.x === s.special.x && head.y === s.special.y);
       const willGrow = eatsFood || eatsSpecial;
@@ -574,19 +601,14 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
       const dir = map[initialDirKey];
       const s = stateRef.current;
       if (dir) {
-        // The fresh snake's body trails to the LEFT of its head, so
-        // restarting with ArrowLeft would move the head straight into
-        // its own second segment on the very first tick — instant
-        // self-collision, which looked like "pressing arrow doesn't
-        // restart it" when really it restarted and died in the same
-        // frame. Only accept the pressed direction if it's actually safe.
+        // The fresh snake's body trails to the LEFT of its head, so only
+        // accept a starting direction that doesn't run into its own body.
         const nextHead = { x: s.snake[0].x + dir.x, y: s.snake[0].y + dir.y };
         const wouldHitSelf = s.snake.some((seg) => seg.x === nextHead.x && seg.y === nextHead.y);
         if (!wouldHitSelf) {
           s.dir = dir;
           s.pendingDir = dir;
         }
-        // else: keep the safe default rightward direction from freshState()
       }
     }
     setScore(0);
@@ -618,9 +640,7 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
       return;
     }
     if (screen !== "game") return;
-    // Only steer while actually playing — arrows/D-pad no longer
-    // double as a "start" trigger. Starting is R / Space / Enter, or
-    // the Start / Resume / Play Again buttons, and nothing else.
+    // Only steer while actually playing — arrows/D-pad never start the game.
     if (phase !== "playing") return;
 
     const s = stateRef.current;
@@ -649,10 +669,8 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
   };
 
   // --- Swipe-to-steer: swipe anywhere on the board instead of tapping
-  // the D-pad. Compares the touch's start/end position; whichever axis
-  // moved further decides the direction, and a minimum distance keeps
-  // an accidental tap (to dismiss an overlay, say) from registering as
-  // a swipe in some random direction.
+  // the D-pad. Whichever axis moved further decides the direction, and a
+  // minimum distance keeps an accidental tap from counting as a swipe.
   const touchStartRef = useRef(null);
   const SWIPE_THRESHOLD = 24; // px
 
@@ -671,7 +689,7 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
     const dy = t.clientY - start.y;
     const absDx = Math.abs(dx);
     const absDy = Math.abs(dy);
-    if (Math.max(absDx, absDy) < SWIPE_THRESHOLD) return; // too small — treat as a tap, not a swipe
+    if (Math.max(absDx, absDy) < SWIPE_THRESHOLD) return;
 
     let key;
     if (absDx > absDy) key = dx > 0 ? "ArrowRight" : "ArrowLeft";
@@ -715,40 +733,74 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
     },
   }));
 
+  const overallBest = Math.max(...LEVELS.map((l) => getBest(l.id)));
+
   return (
     <div
       className="cli-snake-wrap"
-      // The terminal window refocuses its hidden text input on any
-      // click so typing works from anywhere — but that also means
-      // tapping the D-pad or any game button was bubbling up and
-      // refocusing it, popping the mobile keyboard right over the
-      // game. Stopping propagation here keeps every button's own
-      // onClick working while never triggering that refocus.
+      // The terminal window refocuses its hidden text input on any click so
+      // typing works from anywhere — but that also means tapping any game
+      // button bubbled up and popped the mobile keyboard over the game.
       onClick={(e) => e.stopPropagation()}
       style={{
         width: "100%",
-        maxWidth: screen === "game" ? GRID * CELL : 300,
+        maxWidth: screen === "game" ? GRID * CELL : screen === "menu" ? 360 : 300,
         margin: "10px auto",
       }}
     >
       {screen === "menu" && (
         <div className="cli-arcade-device">
-          <div className="cli-arcade-screen">
-            <div className="cli-arcade-screen-games">
-              <div className="cli-arcade-aside-title">SELECT GAME</div>
-              <div className="cli-arcade-menu-item active" onClick={enterLevels}>▶ SNAKE</div>
-              <div className="cli-arcade-menu-item disabled">TETRIS · SOON</div>
-              <div className="cli-arcade-menu-item disabled">PONG · SOON</div>
+          <div className="cli-arcade-header-row">
+            <span className="cli-arcade-header-title">SELECT GAME</span>
+            <span className="cli-arcade-chip">{GAMES.length} LOADED</span>
+          </div>
+
+          <div className="cli-arcade-menu-grid">
+            <div className="cli-arcade-game-list">
+              {GAMES.map((g) => (
+                <div
+                  key={g.id}
+                  className={`cli-arcade-game-card ${g.available ? "active" : "disabled"}`}
+                  onClick={g.available ? enterLevels : undefined}
+                >
+                  {g.available && <div className="cli-arcade-game-card-bar" />}
+                  <div className="cli-arcade-game-card-body">
+                    <div className="cli-arcade-game-card-top">
+                      <span className="cli-arcade-game-name">{g.name}</span>
+                      <span className={`cli-arcade-chip ${g.available ? "active" : ""}`}>
+                        {g.available ? "ACTIVE" : "SOON"}
+                      </span>
+                    </div>
+                    <div className="cli-arcade-game-desc">{g.desc}</div>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="cli-arcade-screen-preview">
-              <AttractPreview />
+
+            <div className="cli-arcade-preview-panel">
+              <div className="cli-arcade-preview-header">
+                <span>ROM: 01</span>
+                <span>LIVE</span>
+              </div>
+              <div className="cli-arcade-preview-screen">
+                <AttractPreview />
+              </div>
+              <div className="cli-arcade-preview-footer">
+                <span>SNAKE.BIN</span>
+                <span>HI: {overallBest}</span>
+              </div>
             </div>
           </div>
-          <div className="cli-arcade-device-buttons">
-            <button type="button" className="cli-snake-btn cli-arcade-start-btn" onClick={enterLevels}>
-              PRESS START
-            </button>
+
+          <div className="cli-arcade-controls-row cli-snake-kbd-hint">
+            <span><b>↵ Enter</b> Start</span>
+            <span><b>Esc</b> Quit</span>
           </div>
+
+          <button type="button" className="cli-arcade-press-start" onClick={enterLevels}>
+            <span>PRESS START</span>
+            <span className="cli-arcade-enter-badge">▶</span>
+          </button>
         </div>
       )}
 
@@ -807,8 +859,7 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
               aspectRatio: "1 / 1",
               margin: "0 auto",
               overflow: "hidden",
-              // Stops the browser from trying to scroll/zoom the page
-              // on a swipe here, so the whole gesture is read as steering.
+              // Stops the browser from scrolling/zooming on a swipe here.
               touchAction: "none",
             }}
           >
@@ -1088,8 +1139,7 @@ const Cli = ({ windowName, setWindowsState, zIndex, bringToFront }) => {
       setGameActive("snake");
       pushLine("snake", null);
       // On mobile, the input that was just focused to type "snake" is
-      // still holding the on-screen keyboard open, which covers the
-      // game. Drop focus immediately so it dismisses.
+      // still holding the on-screen keyboard open over the game.
       inputRef.current?.blur();
       return null;
     },
@@ -1169,10 +1219,8 @@ const Cli = ({ windowName, setWindowsState, zIndex, bringToFront }) => {
 
   const handleKeyDown = (e) => {
     // All snake-game keys are handled by a dedicated global listener
-    // (see the effect below) that works regardless of whether this
-    // input has focus — clicking any game button used to blur it,
-    // which silently broke keyboard control entirely. Nothing to do
-    // here while the game owns input.
+    // (see the effect below) that works regardless of whether this input
+    // has focus. Nothing to do here while the game owns input.
     if (gameActive === "snake") return;
 
     const isCmdOrCtrl = e.metaKey || e.ctrlKey;
@@ -1251,13 +1299,10 @@ const Cli = ({ windowName, setWindowsState, zIndex, bringToFront }) => {
     }
   };
 
-  // Owns ALL snake-game keyboard controls, independent of focus. Any
-  // button click (D-pad, mute, Play Again, anything) blurs the hidden
-  // terminal input, and the effect below intentionally does NOT refocus
-  // it during gameplay (that's what stops the mobile keyboard popping
-  // over the game) — so relying on the input's own onKeyDown meant one
-  // click anywhere silently broke keyboard control. This listens on
-  // window directly instead, so it keeps working no matter what's focused.
+  // Owns ALL snake-game keyboard controls, independent of focus. Any button
+  // click blurs the hidden terminal input, and the effect below intentionally
+  // does NOT refocus it during gameplay (that keeps the mobile keyboard from
+  // popping over the game), so this listens on window directly instead.
   useEffect(() => {
     if (gameActive !== "snake") return;
 

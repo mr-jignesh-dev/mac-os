@@ -124,9 +124,6 @@ main {
 .window .nav .dots .green {
   background-color: #27c93f;
 }
-.window .nav .dots .green::after {
-  content: "✦";
-}
 .window .nav .title {
   flex: 1;
   text-align: center;
