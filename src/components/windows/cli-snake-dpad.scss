@@ -1,0 +1,84 @@
+.cli-window {
+    .cli-snake-mobile-controls {
+        display: none;
+        flex-shrink: 0;
+        justify-content: center;
+        margin-top: 12px;
+        padding-bottom: 10px;
+    }
+
+    .cli-snake-dpad {
+        position: relative;
+        width: 170px;
+        height: 170px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(3, 1fr);
+        gap: 4px;
+
+        &::before {
+            content: "";
+            position: absolute;
+            inset: 4px;
+            border-radius: 50%;
+            border: 1px solid color-mix(in srgb, var(--cli-accent) 35%, transparent);
+            pointer-events: none;
+        }
+    }
+
+    .cli-snake-dpad-center {
+        grid-column: 2;
+        grid-row: 2;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: color-mix(in srgb, var(--cli-accent) 70%, transparent);
+            box-shadow: 0 0 10px color-mix(in srgb, var(--cli-accent) 70%, transparent);
+        }
+    }
+
+    .cli-snake-dpad-btn {
+        border: none;
+        border-radius: 50%;
+        background: radial-gradient(
+            circle at 35% 30%,
+            color-mix(in srgb, var(--cli-accent) 45%, white) 0%,
+            var(--cli-accent) 55%,
+            color-mix(in srgb, var(--cli-accent) 65%, black) 100%
+        );
+        color: #06140c;
+        font-size: 18px;
+        font-weight: 700;
+        box-shadow:
+            0 3px 0 color-mix(in srgb, var(--cli-accent) 65%, black),
+            0 5px 10px rgba(0, 0, 0, 0.4);
+        cursor: pointer;
+        transition: transform 0.08s ease, box-shadow 0.08s ease;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-user-select: none;
+        user-select: none;
+
+        &:active {
+            transform: translateY(2px);
+            box-shadow:
+                0 1px 0 color-mix(in srgb, var(--cli-accent) 65%, black),
+                0 2px 6px rgba(0, 0, 0, 0.4);
+        }
+
+        &.up { grid-column: 2; grid-row: 1; }
+        &.left { grid-column: 1; grid-row: 2; }
+        &.right { grid-column: 3; grid-row: 2; }
+        &.down { grid-column: 2; grid-row: 3; }
+    }
+
+    @media (max-width: 768px) {
+        .cli-snake-mobile-controls {
+            display: flex;
+        }
+    }
+}

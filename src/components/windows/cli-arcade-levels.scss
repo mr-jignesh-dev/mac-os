@@ -1,0 +1,54 @@
+.cli-window {
+    .cli-arcade-aside-title {
+        font-family: "Press Start 2P", monospace;
+        font-size: 9px;
+        color: var(--cli-muted);
+        letter-spacing: 1px;
+        margin-bottom: 6px;
+    }
+
+    .cli-arcade-levels {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .cli-arcade-level-card {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+        padding: 12px 14px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.02);
+        cursor: pointer;
+        box-sizing: border-box;
+        max-width: 100%;
+        transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+
+        &:hover {
+            transform: translateY(-2px);
+            border-color: color-mix(in srgb, var(--cli-accent) 45%, transparent);
+        }
+
+        &.active {
+            border-color: var(--cli-accent);
+            box-shadow: 0 0 14px color-mix(in srgb, var(--cli-accent) 40%, transparent);
+        }
+    }
+
+    .cli-arcade-level-name {
+        font-family: "Press Start 2P", monospace;
+        font-size: 10px;
+        color: var(--cli-fg);
+        letter-spacing: 0.5px;
+    }
+
+    .cli-arcade-level-best {
+        font-family: "Press Start 2P", monospace;
+        font-size: 8px;
+        color: var(--cli-accent);
+    }
+}

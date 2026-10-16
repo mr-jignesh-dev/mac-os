@@ -115,10 +115,10 @@ const MacOSWebsiteLoader = ({ children }) => {
 
                         <WordWindow>
                             <WordList>
-                                <Word>world!</Word>
-                                <Word>coder!</Word>
-                                <Word>users!</Word>
-                                <Word>uiverse</Word>
+                                <Word>Uiverse!</Word>
+                                <Word>World!</Word>
+                                <Word>Coder!</Word>
+                                <Word>Users!</Word>
                             </WordList>
                         </WordWindow>
                     </GreetingContainer>

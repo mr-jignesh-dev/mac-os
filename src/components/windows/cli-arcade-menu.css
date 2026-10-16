@@ -1,0 +1,195 @@
+.cli-window .cli-arcade-device {
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cli-window .cli-arcade-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.cli-window .cli-arcade-header-title {
+  font-family: "Press Start 2P", monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--cli-accent);
+}
+.cli-window .cli-arcade-chip {
+  font-family: "Press Start 2P", monospace;
+  font-size: 7px;
+  letter-spacing: 0.5px;
+  padding: 4px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--cli-muted);
+  color: var(--cli-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.cli-window .cli-arcade-chip.active {
+  color: var(--cli-accent);
+  border-color: var(--cli-accent);
+}
+.cli-window .cli-arcade-menu-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 10px;
+  align-items: start;
+}
+@media (max-width: 480px) {
+  .cli-window .cli-arcade-menu-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.cli-window .cli-arcade-game-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cli-window .cli-arcade-game-card {
+  position: relative;
+  display: flex;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.cli-window .cli-arcade-game-card:hover:not(.disabled) {
+  transform: translateY(-1px);
+}
+.cli-window .cli-arcade-game-card.disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.cli-window .cli-arcade-game-card.active {
+  border-color: var(--cli-accent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--cli-accent) 35%, transparent);
+}
+.cli-window .cli-arcade-game-card-bar {
+  width: 4px;
+  flex-shrink: 0;
+  background: var(--cli-accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--cli-accent) 70%, transparent);
+}
+.cli-window .cli-arcade-game-card-body {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cli-window .cli-arcade-game-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.cli-window .cli-arcade-game-name {
+  font-family: "Press Start 2P", monospace;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: var(--cli-fg);
+}
+.cli-window .cli-arcade-game-card.active .cli-arcade-game-name {
+  color: var(--cli-accent);
+}
+.cli-window .cli-arcade-game-card.disabled .cli-arcade-game-name {
+  color: var(--cli-muted);
+}
+.cli-window .cli-arcade-game-desc {
+  font-size: 10px;
+  color: var(--cli-muted);
+}
+.cli-window .cli-arcade-preview-panel {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #05070d;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.4);
+}
+@media (max-width: 480px) {
+  .cli-window .cli-arcade-preview-panel {
+    width: 100%;
+    max-width: 140px;
+    margin: 0 auto;
+  }
+}
+.cli-window .cli-arcade-preview-header,
+.cli-window .cli-arcade-preview-footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 8px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  color: var(--cli-accent);
+}
+.cli-window .cli-arcade-preview-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.cli-window .cli-arcade-preview-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--cli-muted);
+}
+.cli-window .cli-arcade-preview-screen {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1/1;
+  background: #0a0d12;
+}
+.cli-window .cli-snake-preview-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+.cli-window .cli-arcade-controls-row {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  font-size: 10px;
+  color: var(--cli-muted);
+}
+.cli-window .cli-arcade-controls-row b {
+  color: var(--cli-fg);
+  font-weight: 600;
+}
+.cli-window .cli-arcade-press-start {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: "Press Start 2P", monospace;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: #06140c;
+  background: linear-gradient(135deg, var(--cli-accent), color-mix(in srgb, var(--cli-accent) 60%, white));
+  box-shadow: 0 0 24px color-mix(in srgb, var(--cli-accent) 55%, transparent);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.cli-window .cli-arcade-press-start:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 30px color-mix(in srgb, var(--cli-accent) 65%, transparent);
+}
+.cli-window .cli-arcade-press-start:active {
+  transform: scale(0.98);
+}
+.cli-window .cli-arcade-enter-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.15);
+}/*# sourceMappingURL=cli-arcade-menu.css.map */

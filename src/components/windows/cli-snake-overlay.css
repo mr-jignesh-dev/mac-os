@@ -1,0 +1,98 @@
+.cli-window .cli-snake-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+}
+.cli-window .cli-snake-touch-hint {
+  display: none;
+  font-family: "Press Start 2P", "JetBrains Mono", monospace;
+  font-size: 9px;
+  line-height: 1.6;
+  letter-spacing: 0.5px;
+  color: var(--cli-accent);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--cli-accent) 50%, transparent);
+}
+@media (max-width: 768px) {
+  .cli-window .cli-snake-touch-hint {
+    display: block;
+  }
+}
+.cli-window .cli-snake-modal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 88%;
+  padding: 18px 20px;
+  background: #0b0f1a;
+  border: 1px solid color-mix(in srgb, var(--cli-accent) 55%, transparent);
+  border-radius: 14px;
+  box-shadow: 0 0 26px color-mix(in srgb, var(--cli-accent) 35%, transparent), inset 0 0 20px rgba(0, 0, 0, 0.45);
+}
+.cli-window .cli-snake-overlay-title {
+  font-family: "Press Start 2P", "JetBrains Mono", monospace;
+  font-weight: 400;
+  font-size: 13px;
+  color: var(--cli-fg);
+  letter-spacing: 1px;
+  line-height: 1.6;
+}
+.cli-window .cli-snake-overlay-text {
+  font-size: 11px;
+  color: var(--cli-muted);
+}
+@media (max-width: 768px) {
+  .cli-window .cli-snake-kbd-hint {
+    display: none;
+  }
+}
+.cli-window .cli-snake-countdown {
+  font-family: "Press Start 2P", "JetBrains Mono", monospace;
+  font-size: 40px;
+  color: var(--cli-accent);
+  text-shadow: 0 0 16px color-mix(in srgb, var(--cli-accent) 70%, transparent);
+  animation: cliSnakeCountdownPulse 0.7s ease-in-out;
+}
+@keyframes cliSnakeCountdownPulse {
+  0% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.cli-window .cli-snake-btn {
+  margin-top: 4px;
+  font-family: "Press Start 2P", "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 400;
+  color: #06140c;
+  background: var(--cli-accent);
+  border: none;
+  border-radius: 6px;
+  padding: 9px 16px;
+  cursor: pointer;
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+.cli-window .cli-snake-btn:hover {
+  opacity: 0.9;
+}
+.cli-window .cli-snake-btn:active {
+  transform: scale(0.96);
+}
+.cli-window .cli-snake-btn-secondary {
+  background: transparent;
+  border: 1px solid var(--cli-accent);
+  color: var(--cli-accent);
+}/*# sourceMappingURL=cli-snake-overlay.css.map */
