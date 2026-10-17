@@ -21,7 +21,7 @@ import {
   SPECIAL_SPAWN_CHANCE,
 } from "./Snakeconstants.js";
 import { drawApple, drawPickup, drawSnake } from "./Snakedraw.js";
-import AttractPreview from "./AttractPreview.jsx";
+import AttractPreview from "./Attractpreview.jsx";
 
 // ---------------------------------------------------------------------------
 // Snake Arcade — retro cabinet flow: select game -> select level -> play.
