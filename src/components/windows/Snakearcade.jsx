@@ -5,7 +5,7 @@ import React, {
   forwardRef,
   useImperativeHandle,
 } from "react";
-import { getAccentColor } from "./themeUtils";
+import { getAccentColor } from "./Themeutils.js";
 import {
   GRID,
   CELL,
@@ -19,9 +19,9 @@ import {
   SPECIAL_EVERY_TICKS,
   SPECIAL_LIFETIME_TICKS,
   SPECIAL_SPAWN_CHANCE,
-} from "./snakeConstants";
-import { drawApple, drawPickup, drawSnake } from "./snakeDraw";
-import AttractPreview from "./AttractPreview";
+} from "./Snakeconstants.js";
+import { drawApple, drawPickup, drawSnake } from "./Snakedraw.js";
+import AttractPreview from "./AttractPreview.jsx";
 
 // ---------------------------------------------------------------------------
 // Snake Arcade — retro cabinet flow: select game -> select level -> play.
