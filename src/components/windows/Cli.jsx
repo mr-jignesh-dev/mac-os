@@ -5,7 +5,7 @@ import TypedText from "./TypedText";
 import CommandChips from "./CommandChips";
 import SnakeArcade from "./SnakeArcade";
 import { QUIZ_QUESTIONS } from "./quizQuestions";
-import { modKey } from "./platformUtils.js";
+import { modKey } from "./Platformutils.js";
 import "./cli.scss";
 
 const Cli = ({ windowName, setWindowsState, zIndex, bringToFront }) => {
