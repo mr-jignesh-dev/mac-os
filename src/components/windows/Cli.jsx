@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { RiGamepadLine, RiKeyboardFill } from "react-icons/ri";
-import MacWindow from "./MacWindow";
-import TypedText from "./TypedText";
-import CommandChips from "./CommandChips";
-import SnakeArcade from "./SnakeArcade";
-import { QUIZ_QUESTIONS } from "./quizQuestions";
+import MacWindow from "./MacWindow.jsx";
+import TypedText from "./Typedtext.jsx";
+import CommandChips from "./Commandchips.jsx";
+import SnakeArcade from "./Snakearcade.jsx";
+import { QUIZ_QUESTIONS } from "./Quizquestions.js";
 import { modKey } from "./Platformutils.js";
 import "./cli.scss";
 
