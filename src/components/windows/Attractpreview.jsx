@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from "react";
-import { getAccentColor } from "./themeUtils";
-import { drawApple, drawSnake } from "./snakeDraw";
+import { getAccentColor } from "./Themeutils.js";
+import { drawApple, drawSnake } from "./Snakedraw.js";
 
 /** Self-playing demo for the select screen. It uses the same drawSnake and
  *  drawApple as the real game, and actually hunts the apple, so what you see
