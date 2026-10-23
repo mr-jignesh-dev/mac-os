@@ -6,6 +6,13 @@ export const CELL = 14; // the board should stay compact, not fill the window
 export const MOBILE_CELL = 20;
 export const MOBILE_QUERY = "(max-width: 768px)";
 
+// On phones the board grows TALLER (it can't get wider than the screen).
+// Rows are picked per run from the space left on screen: viewport height
+// minus this reserve (window chrome, header, toolbar, prompt line),
+// capped so the whole board always fits without scrolling.
+export const MOBILE_MAX_ROWS = 28;
+export const MOBILE_RESERVED_HEIGHT = 320;
+
 // Short, disconnected wall segments — used instead of full-width lines with
 // a single shared gap, which is easy to accidentally cancel out where it
 // crosses a perpendicular wall (that made the old MAZE RUN unsolvable).

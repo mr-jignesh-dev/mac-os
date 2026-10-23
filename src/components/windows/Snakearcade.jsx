@@ -11,6 +11,8 @@ import {
   CELL,
   MOBILE_CELL,
   MOBILE_QUERY,
+  MOBILE_MAX_ROWS,
+  MOBILE_RESERVED_HEIGHT,
   LEVELS,
   GAMES,
   getBest,
@@ -19,7 +21,7 @@ import {
   SPECIAL_EVERY_TICKS,
   SPECIAL_LIFETIME_TICKS,
   SPECIAL_SPAWN_CHANCE,
-} from "./Snakeconstants.js";
+} from "./snakeConstants";
 import { drawApple, drawPickup, drawSnake } from "./Snakedraw.js";
 import AttractPreview from "./Attractpreview.jsx";
 
@@ -53,11 +55,9 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
 
   const level = LEVELS[levelIndex];
 
-  // On phones the board is drawn at a larger cell size (a bigger board
-  // that fills the window) since the on-screen D-pad is gone and the
-  // freed space is better spent on the play area. The canvas's internal
-  // resolution changes with it, so the snake stays crisp instead of
-  // being CSS-stretched.
+  // On phones the board is drawn at a larger cell size. The canvas's
+  // internal resolution changes with it, so the snake stays crisp instead
+  // of being CSS-stretched.
   const [isMobile, setIsMobile] = useState(
     () => typeof window !== "undefined" && window.matchMedia(MOBILE_QUERY).matches
   );
@@ -72,6 +72,23 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
   // size through a ref instead of capturing a stale value.
   const cellRef = useRef(cell);
   cellRef.current = cell;
+
+  // The board is as wide as the screen allows, so on a portrait phone the
+  // only way to get a bigger play area is to make it TALLER. Rows are
+  // chosen once per run from the space actually left on screen (never
+  // mid-run, which would invalidate the snake's position), and capped so
+  // the whole board always stays visible — touch scrolling is disabled on
+  // it, so a board taller than the screen would hide part of the game.
+  const [rows, setRows] = useState(GRID);
+  const pickRows = () => {
+    if (typeof window === "undefined" || !window.matchMedia(MOBILE_QUERY).matches) return GRID;
+    const vw = window.visualViewport?.width ?? window.innerWidth;
+    const vh = window.visualViewport?.height ?? window.innerHeight;
+    const boardPx = Math.min(GRID * MOBILE_CELL, vw - 60);
+    const cellPx = boardPx / GRID;
+    const fit = Math.floor((vh - MOBILE_RESERVED_HEIGHT) / cellPx);
+    return Math.max(GRID, Math.min(MOBILE_MAX_ROWS, fit));
+  };
 
   // ---------------------------------------------------------------------
   // Synthesized sound effects — no audio files to host or load.
@@ -125,11 +142,11 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
   // ---------------------------------------------------------------------
   // Game state (mutable ref — avoids a re-render every tick)
   // ---------------------------------------------------------------------
-  const randomEmptyCell = (snake, obstacles, exclude = []) => {
+  const randomEmptyCell = (snake, obstacles, exclude = [], rowCount = GRID) => {
     let pos;
     let guard = 0;
     do {
-      pos = { x: Math.floor(Math.random() * GRID), y: Math.floor(Math.random() * GRID) };
+      pos = { x: Math.floor(Math.random() * GRID), y: Math.floor(Math.random() * rowCount) };
       guard += 1;
     } while (
       guard < 200 &&
@@ -140,14 +157,22 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
     return pos;
   };
 
-  const freshState = (lvl) => {
-    const snake = [{ x: 8, y: 9 }, { x: 7, y: 9 }, { x: 6, y: 9 }];
+  const freshState = (lvl, rowCount = GRID) => {
+    // Level layouts are authored for an 18x18 board. On a taller board,
+    // shift them down so they stay centred instead of hugging the top.
+    const yOff = Math.floor((rowCount - GRID) / 2);
+    const midY = 9 + yOff;
+    const snake = [{ x: 8, y: midY }, { x: 7, y: midY }, { x: 6, y: midY }];
+    const obstacles = lvl.obstacles.map((o) => ({ x: o.x, y: o.y + yOff }));
     return {
       snake,
+      rows: rowCount,
       dir: { x: 1, y: 0 },
-      pendingDir: { x: 1, y: 0 },
-      obstacles: lvl.obstacles,
-      food: randomEmptyCell(snake, lvl.obstacles),
+      // Turns waiting for the next game step. A queue (not one slot) so
+      // two quick swipes inside a single step both register.
+      dirQueue: [],
+      obstacles,
+      food: randomEmptyCell(snake, obstacles, [], rowCount),
       special: null,
       specialTicksLeft: 0,
       invincibleTicksLeft: 0,
@@ -188,17 +213,18 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
   };
 
   // Size the canvas every time the game screen (and a fresh <canvas>)
-  // mounts — the canvas doesn't exist while on the menu/levels screens.
+  // mounts, or the cell size / row count changes — the canvas doesn't
+  // exist while on the menu/levels screens.
   useEffect(() => {
     if (screen !== "game") return;
     const canvas = canvasRef.current;
     if (canvas) {
       canvas.width = GRID * cell;
-      canvas.height = GRID * cell;
+      canvas.height = rows * cell;
       draw(); // avoid a blank flash before the next tick/countdown redraws it
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [screen, cell]);
+  }, [screen, cell, rows]);
 
   useEffect(() => {
     if (screen !== "game" || phase !== "playing") return;
@@ -215,14 +241,15 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
     const tick = () => {
       const s = stateRef.current;
       if (!s) return;
-      s.dir = s.pendingDir;
+      // Take the next waiting turn, if any (see dirQueue above).
+      if (s.dirQueue.length) s.dir = s.dirQueue.shift();
       let head = { x: s.snake[0].x + s.dir.x, y: s.snake[0].y + s.dir.y };
       const invincible = s.invincibleTicksLeft > 0;
 
-      const hitWall = head.x < 0 || head.y < 0 || head.x >= GRID || head.y >= GRID;
+      const hitWall = head.x < 0 || head.y < 0 || head.x >= GRID || head.y >= s.rows;
       if (hitWall) {
         if (invincible) {
-          head = { x: (head.x + GRID) % GRID, y: (head.y + GRID) % GRID }; // ghost-mode tunnel
+          head = { x: (head.x + GRID) % GRID, y: (head.y + s.rows) % s.rows }; // ghost-mode tunnel
         } else {
           endGame(s);
           return;
@@ -254,7 +281,7 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
       let grew = false;
       if (eatsFood) {
         s.score += 1;
-        s.food = randomEmptyCell(s.snake, s.obstacles, s.special ? [s.special] : []);
+        s.food = randomEmptyCell(s.snake, s.obstacles, s.special ? [s.special] : [], s.rows);
         playEat();
         grew = true;
       } else if (eatsSpecial) {
@@ -279,7 +306,7 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
         if (s.specialTicksLeft <= 0) s.special = null;
       } else if (s.tickCount % SPECIAL_EVERY_TICKS === 0 && Math.random() < SPECIAL_SPAWN_CHANCE) {
         s.special = {
-          ...randomEmptyCell(s.snake, s.obstacles, [s.food]),
+          ...randomEmptyCell(s.snake, s.obstacles, [s.food], s.rows),
           kind: Math.random() < 0.7 ? "bonus" : "power",
         };
         s.specialTicksLeft = SPECIAL_LIFETIME_TICKS;
@@ -320,7 +347,9 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
   };
 
   const beginGame = (initialDirKey, lvl = level) => {
-    stateRef.current = freshState(lvl);
+    const r = pickRows();
+    setRows(r);
+    stateRef.current = freshState(lvl, r);
     if (initialDirKey) {
       const map = {
         ArrowUp: { x: 0, y: -1 },
@@ -337,7 +366,6 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
         const wouldHitSelf = s.snake.some((seg) => seg.x === nextHead.x && seg.y === nextHead.y);
         if (!wouldHitSelf) {
           s.dir = dir;
-          s.pendingDir = dir;
         }
       }
     }
@@ -358,6 +386,8 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
     else if (phase === "paused") resumeGame();
   };
 
+  // Returns true only when a turn was actually queued, so callers (the
+  // swipe handler) can skip feedback for ignored input.
   const applyDirection = (key) => {
     if (screen === "levels") {
       if (key === "ArrowUp") {
@@ -367,11 +397,11 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
         playClick();
         setLevelIndex((i) => (i + 1) % LEVELS.length);
       }
-      return;
+      return false;
     }
-    if (screen !== "game") return;
-    // Only steer while actually playing — arrows/D-pad never start the game.
-    if (phase !== "playing") return;
+    if (screen !== "game") return false;
+    // Only steer while actually playing — arrows/swipes never start the game.
+    if (phase !== "playing") return false;
 
     const s = stateRef.current;
     const map = {
@@ -381,9 +411,15 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
       ArrowRight: { x: 1, y: 0 },
     };
     const next = map[key];
-    if (!next || !s) return;
-    if (next.x === -s.dir.x && next.y === -s.dir.y) return;
-    s.pendingDir = next;
+    if (!next || !s) return false;
+    // Judge the new turn against the LAST turn already waiting, not the
+    // current heading, so queued turns chain correctly (e.g. up, then left).
+    const last = s.dirQueue.length ? s.dirQueue[s.dirQueue.length - 1] : s.dir;
+    if (next.x === last.x && next.y === last.y) return false; // already going that way
+    if (next.x === -last.x && next.y === -last.y) return false; // can't reverse
+    if (s.dirQueue.length >= 3) return false;
+    s.dirQueue.push(next);
+    return true;
   };
 
   const handleStartPause = () => {
@@ -394,34 +430,39 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
   };
 
   // --- Swipe-to-steer: on phones this is the only way to steer (there is
-  // no on-screen D-pad). Whichever axis moved further decides the direction, and a
-  // minimum distance keeps an accidental tap from counting as a swipe.
+  // no on-screen D-pad).
   const touchStartRef = useRef(null);
-  const SWIPE_THRESHOLD = 24; // px
+  const SWIPE_THRESHOLD = 14; // px of finger travel before it counts as a swipe
 
   const handleTouchStart = (e) => {
     const t = e.touches[0];
     touchStartRef.current = { x: t.clientX, y: t.clientY };
   };
 
-  const handleTouchEnd = (e) => {
+  // The turn is applied the moment the finger has travelled far enough —
+  // NOT when it lifts. Waiting for touchend made every turn start a full
+  // gesture late, which is what felt like lag. After a swipe is recognised
+  // the anchor moves to the finger's current spot, so one continuous drag
+  // can chain several turns without lifting.
+  const handleTouchMove = (e) => {
     const start = touchStartRef.current;
-    touchStartRef.current = null;
     if (!start) return;
-
-    const t = e.changedTouches[0];
+    const t = e.touches[0];
     const dx = t.clientX - start.x;
     const dy = t.clientY - start.y;
-    const absDx = Math.abs(dx);
-    const absDy = Math.abs(dy);
-    if (Math.max(absDx, absDy) < SWIPE_THRESHOLD) return;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_THRESHOLD) return;
 
-    let key;
-    if (absDx > absDy) key = dx > 0 ? "ArrowRight" : "ArrowLeft";
-    else key = dy > 0 ? "ArrowDown" : "ArrowUp";
+    const key =
+      Math.abs(dx) > Math.abs(dy)
+        ? dx > 0 ? "ArrowRight" : "ArrowLeft"
+        : dy > 0 ? "ArrowDown" : "ArrowUp";
 
-    playClick();
-    applyDirection(key);
+    touchStartRef.current = { x: t.clientX, y: t.clientY };
+    if (applyDirection(key)) playClick();
+  };
+
+  const handleTouchEnd = () => {
+    touchStartRef.current = null;
   };
 
   const enterLevels = () => {
@@ -546,7 +587,16 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
       )}
 
       {screen === "game" && (
-        <div>
+        <div
+          // Swipes are read on the whole game area, not just the board, so
+          // there is plenty of room to swipe in. touch-action:none stops
+          // the browser scrolling/zooming the page instead.
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
+          style={{ touchAction: "none", paddingBottom: 12 }}
+        >
           <div className="cli-snake-toolbar">
             <button type="button" className="cli-snake-icon-btn" onClick={backToLevels} title="Back to levels">‹</button>
             <span className="cli-snake-score">🍎 {score}</span>
@@ -574,25 +624,21 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
           </div>
 
           <div
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
             className="cli-snake-board"
             style={{
               position: "relative",
               width: "100%",
               maxWidth: GRID * cell,
-              aspectRatio: "1 / 1",
+              aspectRatio: `${GRID} / ${rows}`,
               margin: "0 auto",
               overflow: "hidden",
-              // Stops the browser from scrolling/zooming on a swipe here.
-              touchAction: "none",
             }}
           >
             <canvas
               ref={canvasRef}
               className="cli-snake-canvas"
               width={GRID * cell}
-              height={GRID * cell}
+              height={rows * cell}
               style={{ display: "block", width: "100%", height: "100%" }}
             />
 
