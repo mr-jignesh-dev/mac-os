@@ -36,10 +36,11 @@ interface ProjectEntry {
 
 const portfolioProjects: ProjectEntry[] = [
   {
-    title: "AI for Growth | Full-Stack AI Career Ecosystem",[cite: 4]
-    link: "https://ai-for-growth-mj.vercel.app",[cite: 4]
-    description: "End-to-end AI career ecosystem incorporating AI Career Coach, Interview IQ, and AI Resume Analyzer with multi-LLM integrations (GPT-4o-mini, Gemini, Claude AI).",[cite: 4]
-    techStack: ["React.js", "Node.js", "Express.js", "MongoDB", "JWT", "Socket.io", "Razorpay", "LLM APIs"][cite: 4]
+    title: "InterviewIQ.AI - Smart Interview Platform",
+    description: "An AI-powered mock interview platform featuring role & experience selection, smart voice interactions, dynamic follow-up questions, and timer-based simulations.",
+    tags: ["React.js","Node.js", "Express.js","MongoDB","OpenRouter API","Razorpay","JWT"],
+    repoLink: "https://github.com/mr-jignesh-dev/InterviewIQ.AI",
+    demoLink: "https://interviewiq-ai-mj.onrender.com/"
   }
 ];
 

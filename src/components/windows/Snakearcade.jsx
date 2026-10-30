@@ -21,7 +21,7 @@ import {
   SPECIAL_EVERY_TICKS,
   SPECIAL_LIFETIME_TICKS,
   SPECIAL_SPAWN_CHANCE,
-} from "./snakeConstants";
+} from "./Snakeconstants.js";
 import { drawApple, drawPickup, drawSnake } from "./Snakedraw.js";
 import AttractPreview from "./Attractpreview.jsx";
 
@@ -93,6 +93,11 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
   // ---------------------------------------------------------------------
   // Synthesized sound effects — no audio files to host or load.
   // ---------------------------------------------------------------------
+  // Read through a ref so sounds scheduled from long-lived timers/intervals
+  // (the countdown, the game loop) still respect a mute toggled mid-game.
+  const soundOnRef = useRef(soundOn);
+  soundOnRef.current = soundOn;
+
   const getAudioCtx = () => {
     if (!audioCtxRef.current) {
       const AC = window.AudioContext || window.webkitAudioContext;
@@ -102,30 +107,139 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
     return audioCtxRef.current;
   };
 
-  const beep = (freq, duration = 0.06, type = "square", sweepFrom) => {
-    if (!soundOn) return;
+  // One oscillator note. `at` delays it (seconds) so several notes can be
+  // scheduled together as a little jingle; `to` makes it glide from freq
+  // to that pitch.
+  const tone = ({ freq, to, at = 0, dur = 0.08, type = "square", vol = 0.09 }) => {
+    if (!soundOnRef.current) return;
     try {
       const ctx = getAudioCtx();
+      const t0 = ctx.currentTime + at;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = type;
-      osc.frequency.setValueAtTime(sweepFrom || freq, ctx.currentTime);
-      if (sweepFrom) osc.frequency.exponentialRampToValueAtTime(freq, ctx.currentTime + duration);
-      gain.gain.setValueAtTime(0.09, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
+      osc.frequency.setValueAtTime(freq, t0);
+      if (to) osc.frequency.exponentialRampToValueAtTime(to, t0 + dur);
+      gain.gain.setValueAtTime(vol, t0);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
       osc.connect(gain).connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + duration);
+      osc.start(t0);
+      osc.stop(t0 + dur + 0.02);
     } catch {
       /* Web Audio unavailable — game still works without sound */
     }
   };
 
-  const playClick = () => beep(520, 0.045, "square");
-  const playEat = () => beep(880, 0.09, "square", 480);
-  const playBonus = () => beep(1200, 0.12, "square", 700);
-  const playPower = () => beep(300, 0.22, "sine", 900);
-  const playGameOver = () => beep(110, 0.35, "sawtooth", 420);
+  // Every action gets its own sound so you can tell them apart by ear.
+  // Steering (swipes / arrow keys) is deliberately silent.
+  const sfx = {
+    // menus
+    nav: () => tone({ freq: 700, dur: 0.03, type: "triangle", vol: 0.06 }),
+    confirm: () => {
+      tone({ freq: 523, dur: 0.07 });
+      tone({ freq: 784, at: 0.07, dur: 0.09 });
+    },
+    levelPick: () => {
+      tone({ freq: 392, dur: 0.06, type: "triangle" });
+      tone({ freq: 523, at: 0.06, dur: 0.06, type: "triangle" });
+      tone({ freq: 659, at: 0.12, dur: 0.1, type: "triangle" });
+    },
+    back: () => {
+      tone({ freq: 523, dur: 0.06, type: "triangle" });
+      tone({ freq: 330, at: 0.06, dur: 0.09, type: "triangle" });
+    },
+    // run flow
+    start: () => tone({ freq: 300, to: 900, dur: 0.16 }),
+    tick: () => tone({ freq: 480, dur: 0.08, type: "triangle" }),
+    go: () => {
+      tone({ freq: 880, dur: 0.07 });
+      tone({ freq: 1175, at: 0.07, dur: 0.14 });
+    },
+    pause: () => {
+      tone({ freq: 660, dur: 0.07 });
+      tone({ freq: 440, at: 0.07, dur: 0.12 });
+    },
+    resume: () => {
+      tone({ freq: 440, dur: 0.07 });
+      tone({ freq: 660, at: 0.07, dur: 0.12 });
+    },
+    // pickups
+    eat: () => tone({ freq: 420, to: 840, dur: 0.08, type: "triangle", vol: 0.12 }), // red apple: soft blip
+    bonus: () => {
+      // yellow +5: bright two-note coin
+      tone({ freq: 988, dur: 0.08, vol: 0.1 });
+      tone({ freq: 1319, at: 0.08, dur: 0.22, vol: 0.1 });
+    },
+    power: () => {
+      // ghost: long rising whoosh, then a shimmer
+      tone({ freq: 200, to: 1200, dur: 0.4, type: "sine", vol: 0.12 });
+      tone({ freq: 1568, at: 0.4, dur: 0.08, type: "sine", vol: 0.08 });
+      tone({ freq: 2093, at: 0.48, dur: 0.12, type: "sine", vol: 0.08 });
+    },
+    gameOver: () => tone({ freq: 420, to: 110, dur: 0.35, type: "sawtooth" }),
+  };
+
+  // Low "shaking" rumble, for devices that can't vibrate: a deep sawtooth
+  // run through a lowpass, with an LFO opening and closing the volume ~24x
+  // a second — that tremolo is what makes it feel like a shake, not a hum.
+  const rumble = () => {
+    if (!soundOnRef.current) return;
+    try {
+      const ctx = getAudioCtx();
+      const t0 = ctx.currentTime;
+      const dur = 0.55;
+
+      const osc = ctx.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(95, t0);
+      osc.frequency.linearRampToValueAtTime(55, t0 + dur);
+
+      const lowpass = ctx.createBiquadFilter();
+      lowpass.type = "lowpass";
+      lowpass.frequency.value = 420;
+
+      const shake = ctx.createGain();
+      shake.gain.value = 0.5;
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = 24;
+      const lfoDepth = ctx.createGain();
+      lfoDepth.gain.value = 0.5;
+      lfo.connect(lfoDepth);
+      lfoDepth.connect(shake.gain);
+
+      const env = ctx.createGain();
+      env.gain.setValueAtTime(0.0001, t0);
+      env.gain.linearRampToValueAtTime(0.3, t0 + 0.04);
+      env.gain.linearRampToValueAtTime(0.0001, t0 + dur);
+
+      osc.connect(lowpass);
+      lowpass.connect(shake);
+      shake.connect(env);
+      env.connect(ctx.destination);
+
+      osc.start(t0);
+      lfo.start(t0);
+      osc.stop(t0 + dur + 0.02);
+      lfo.stop(t0 + dur + 0.02);
+    } catch {
+      /* Web Audio unavailable */
+    }
+  };
+
+  // On death: phones vibrate; everything else gets the rumble. A touch
+  // screen is detected by its pointer, not by navigator.vibrate existing —
+  // desktop Chrome has that function too, but it does nothing there. iPhones
+  // have no vibrate API at all, so they fall through to the rumble as well.
+  // The sound toggle silences both, so one button means "quiet".
+  const deathFeedback = () => {
+    if (!soundOnRef.current) return;
+    const touchPrimary = window.matchMedia("(pointer: coarse)").matches;
+    if (touchPrimary && typeof navigator.vibrate === "function") {
+      navigator.vibrate([150, 70, 150, 70, 250]);
+    } else {
+      rumble();
+    }
+  };
 
   const toggleSound = () => {
     setSoundOn((s) => {
@@ -233,7 +347,8 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
       s.over = true;
       draw();
       setPhase("over");
-      playGameOver();
+      sfx.gameOver();
+      deathFeedback();
       setBestIfHigher(level.id, s.score);
       onGameOver && onGameOver(s.score);
     };
@@ -282,15 +397,15 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
       if (eatsFood) {
         s.score += 1;
         s.food = randomEmptyCell(s.snake, s.obstacles, s.special ? [s.special] : [], s.rows);
-        playEat();
+        sfx.eat();
         grew = true;
       } else if (eatsSpecial) {
         if (s.special.kind === "bonus") {
           s.score += 5;
-          playBonus();
+          sfx.bonus();
         } else {
           s.invincibleTicksLeft = INVINCIBLE_TICKS;
-          playPower();
+          sfx.power();
         }
         s.special = null;
         grew = true;
@@ -327,20 +442,24 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
   };
   useEffect(() => clearCountdownTimers, []);
 
-  const runCountdownThen = (afterFn) => {
+  // The first beat plays whatever sound belongs to the action that started
+  // the countdown (start vs resume), then tick, tick, and a "go" as play
+  // begins — so Start, Play Again and Resume each sound different.
+  const runCountdownThen = (afterFn, openingSound) => {
     clearCountdownTimers();
     setPhase("countdown");
     setCountdown(3);
-    playClick();
+    if (openingSound) openingSound();
     [2, 1].forEach((n, i) => {
       const t = setTimeout(() => {
         setCountdown(n);
-        playClick();
+        sfx.tick();
       }, (i + 1) * 700);
       countdownTimers.current.push(t);
     });
     const finalT = setTimeout(() => {
       setCountdown(null);
+      sfx.go();
       afterFn();
     }, 3 * 700);
     countdownTimers.current.push(finalT);
@@ -376,14 +495,16 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
     runCountdownThen(() => {
       setPhase("playing");
       onGameStart && onGameStart();
-    });
+    }, sfx.start);
   };
 
-  const resumeGame = () => runCountdownThen(() => setPhase("playing"));
+  const resumeGame = () => runCountdownThen(() => setPhase("playing"), sfx.resume);
 
   const togglePause = () => {
-    if (phase === "playing") setPhase("paused");
-    else if (phase === "paused") resumeGame();
+    if (phase === "playing") {
+      setPhase("paused");
+      sfx.pause();
+    } else if (phase === "paused") resumeGame();
   };
 
   // Returns true only when a turn was actually queued, so callers (the
@@ -391,10 +512,10 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
   const applyDirection = (key) => {
     if (screen === "levels") {
       if (key === "ArrowUp") {
-        playClick();
+        sfx.nav();
         setLevelIndex((i) => (i - 1 + LEVELS.length) % LEVELS.length);
       } else if (key === "ArrowDown") {
-        playClick();
+        sfx.nav();
         setLevelIndex((i) => (i + 1) % LEVELS.length);
       }
       return false;
@@ -423,7 +544,6 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
   };
 
   const handleStartPause = () => {
-    playClick();
     if (screen !== "game") return;
     if (phase === "playing" || phase === "paused") togglePause();
     else beginGame();
@@ -458,7 +578,7 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
         : dy > 0 ? "ArrowDown" : "ArrowUp";
 
     touchStartRef.current = { x: t.clientX, y: t.clientY };
-    if (applyDirection(key)) playClick();
+    applyDirection(key);
   };
 
   const handleTouchEnd = () => {
@@ -466,18 +586,18 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
   };
 
   const enterLevels = () => {
-    playClick();
+    sfx.confirm();
     setScreen("levels");
   };
 
   const playLevel = (idx) => {
-    playClick();
+    sfx.levelPick();
     setLevelIndex(idx);
     beginGame(null, LEVELS[idx]);
   };
 
   const backToLevels = () => {
-    playClick();
+    sfx.back();
     setPhase("ready");
     setScreen("levels");
   };
@@ -607,7 +727,7 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
                 type="button"
                 className={`cli-snake-icon-btn ${!soundOn ? "is-muted" : ""}`}
                 onClick={toggleSound}
-                title={soundOn ? "Mute sound" : "Unmute sound"}
+                title={soundOn ? "Mute sound & vibration" : "Unmute sound & vibration"}
               >
                 {soundOn ? "🔊" : "🔇"}
               </button>
@@ -650,7 +770,7 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
                     {"Press Space / Enter / Arrows to Start\nP to pause · Esc to quit"}
                   </div>
                   <div className="cli-snake-touch-hint">Swipe to change direction</div>
-                  <button type="button" className="cli-snake-btn" onClick={() => { playClick(); beginGame(); }}>
+                  <button type="button" className="cli-snake-btn" onClick={() => beginGame()}>
                     Start
                   </button>
                 </div>
@@ -668,7 +788,7 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
               <div className="cli-snake-overlay">
                 <div className="cli-snake-modal">
                   <div className="cli-snake-overlay-title">PAUSED</div>
-                  <button type="button" className="cli-snake-btn" onClick={() => { playClick(); resumeGame(); }}>
+                  <button type="button" className="cli-snake-btn" onClick={() => resumeGame()}>
                     Resume
                   </button>
                 </div>
@@ -685,7 +805,7 @@ const SnakeArcade = forwardRef(({ onGameOver, onGameStart }, ref) => {
                     <span className="cli-snake-kbd-hint">{"\n(Press R, Enter, or Space to restart)"}</span>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
-                    <button type="button" className="cli-snake-btn" onClick={() => { playClick(); beginGame(); }}>
+                    <button type="button" className="cli-snake-btn" onClick={() => beginGame()}>
                       Play Again
                     </button>
                     <button type="button" className="cli-snake-btn cli-snake-btn-secondary" onClick={backToLevels}>
